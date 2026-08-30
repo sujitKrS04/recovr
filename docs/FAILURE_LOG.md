@@ -4,6 +4,33 @@ This document tracks all meaningful technical failures, how they were detected, 
 
 ---
 
+## Failure #012 — Unignored local environment file and loose debugging scripts in backend root
+**Date:** 2026-08-31
+**Phase:** Phase 10 — Polish, responsive pass, and demo prep
+**Component:** Repo hygiene / Security
+
+### What broke?
+The `backend/.gitignore` file only contained `"README.md"`, leaving local database files, caching structures, python binaries, virtual environments, and—most importantly—the `.env` containing sensitive integration credentials (OpenRouter and Razorpay secrets) unignored. As a result, the `.env` file was added to the git stage index. Multiple loose test/debugging scripts were also cluttering the `backend/` root directory.
+
+### How was it detected?
+Final repo scan and security review before pushing to GitHub.
+
+### Root cause
+Inadequate initial scaffolding of `.gitignore` in Phase 0 and ad-hoc creation of utility scripts during successive development phases.
+
+### What did we change?
+1. Overwrote `backend/.gitignore` with a comprehensive Python gitignore template explicitly ignoring `.env`, `.venv`, caching caches, logs, and build artifacts.
+2. Removed the `.env` file from the git index tracking via `git rm --cached backend/.env` so that it is no longer tracked or staged for future commits, while keeping the local file in place.
+3. Deleted old, one-off scripts (`add_enum.py`, `debug_reasons.py`) and reorganized the remaining developer tools (`verify_batch.py`, `verify_classifications.py`, `verify_schema.py`, `test_ws.py`, `test_classifier_rules.py`, `setup_db.py`) into the `backend/scripts/` directory.
+
+### Why this fix?
+Prevents accidental commits of API keys and credentials to public repositories, and ensures the workspace conforms to structured project guidelines.
+
+### Final result
+Resolved. The `.env` file is successfully untracked in git index and ignored by the new `.gitignore` rules, while remaining locally functional.
+
+---
+
 ## Failure #011 — Browser environment TypeScript namespace error with NodeJS.Timeout & parameter signature mismatch
 **Date:** 2026-08-30
 **Phase:** Phase 9 — Frontend Data Wiring
@@ -270,6 +297,42 @@ Do not write minimal Alembic ini files by hand. Use `alembic init` output as the
 
 ---
 
+## Failure #002 — Docker Desktop not running; `docker compose up` failed
+**Date:** 2026-08-30
+**Phase:** Phase 0 — Scaffold
+**Component:** Infrastructure / Docker
+
+### What broke?
+`docker compose up -d postgres` failed with: `unable to get image 'postgres:16': failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine`.
+
+### How was it detected?
+Command was run immediately and returned non-zero exit code with the npipe connection error.
+
+### Root cause
+Docker Desktop was not running on the developer machine. The docker daemon was not accessible.
+
+### What did we change?
+- Detected that PostgreSQL 18 was already installed and running natively on port 5432 (`postgresql-x64-18` Windows service, confirmed via `Get-Service` + `netstat`)
+- Used `psycopg2` (already in the venv) to create the `recovr` database and user via Python script, bypassing both Docker and psql PATH issues
+- Also removed the obsolete `version: "3.9"` field from `docker-compose.yml` which was generating a warning
+
+### Why this fix?
+The native PostgreSQL install is fully functional and eliminates Docker as a dependency for local dev. Docker Compose is retained in the repo for reproducibility in other environments (CI, other devs, demo judges who clone and run).
+
+### Verification
+Backend health endpoint at `http://localhost:8000/health` returned `{"status": "ok"}`. DB connection confirmed via psycopg2 script.
+
+### Final result
+Development environment fully operational without Docker Desktop.
+
+### Production implication
+The `docker-compose.yml` remains the canonical way to run postgres in a fresh environment. The `setup_db.py` script is a fallback for environments where Docker is unavailable.
+
+### Lesson
+Scaffold setups should detect whether Docker is running and fall back gracefully. Providing a `setup_db.py` script as an alternative to Docker Compose improves developer onboarding robustness.
+
+---
+
 ## Failure #001 — setup_db.py crashed on Windows due to Unicode checkmarks + bad docstring escape
 **Date:** 2026-08-30
 **Phase:** Phase 0 — Scaffold
@@ -304,40 +367,4 @@ Any utility scripts that print status should avoid Unicode emoji/symbols unless 
 
 ### Lesson
 Always test developer utility scripts on the target OS (Windows) before relying on them. Python's default stdout encoding on Windows is system code page, not UTF-8.
-
----
-
-## Failure #002 — Docker Desktop not running; `docker compose up` failed
-**Date:** 2026-08-30
-**Phase:** Phase 0 — Scaffold
-**Component:** Infrastructure / Docker
-
-### What broke?
-`docker compose up -d postgres` failed with: `unable to get image 'postgres:16': failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine`.
-
-### How was it detected?
-Command was run immediately and returned non-zero exit code with the npipe connection error.
-
-### Root cause
-Docker Desktop was not running on the developer machine. The docker daemon was not accessible.
-
-### What did we change?
-- Detected that PostgreSQL 18 was already installed and running natively on port 5432 (`postgresql-x64-18` Windows service, confirmed via `Get-Service` + `netstat`)
-- Used `psycopg2` (already in the venv) to create the `recovr` database and user via Python script, bypassing both Docker and psql PATH issues
-- Also removed the obsolete `version: "3.9"` field from `docker-compose.yml` which was generating a warning
-
-### Why this fix?
-The native PostgreSQL install is fully functional and eliminates Docker as a dependency for local dev. Docker Compose is retained in the repo for reproducibility in other environments (CI, other devs, demo judges who clone and run).
-
-### Verification
-Backend health endpoint at `http://localhost:8000/health` returned `{"status": "ok"}`. DB connection confirmed via psycopg2 script.
-
-### Final result
-Development environment fully operational without Docker Desktop.
-
-### Production implication
-The `docker-compose.yml` remains the canonical way to run postgres in a fresh environment. The `setup_db.py` script is a fallback for environments where Docker is unavailable.
-
-### Lesson
-Scaffold setups should detect whether Docker is running and fall back gracefully. Providing a `setup_db.py` script as an alternative to Docker Compose improves developer onboarding robustness.
 
