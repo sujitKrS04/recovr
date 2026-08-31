@@ -4,6 +4,27 @@ This document organizes all demo moments, engineering evidence, and metrics arou
 
 ---
 
+## 🎬 Opening Beat — Landing Page (`/`)
+
+> *Start the recording here. Navigate to `http://localhost:5173`. The landing page should be the first thing judges see.*
+
+### What's on screen
+- **Recovr wordmark** — `RECOVR · AI` in the top-left, matched exactly to the in-product sidebar brand.
+- **Headline**: "Stop losing revenue to failed payments."
+- **Problem statement** (one sentence): Recovr intercepts every failed transaction, classifies the root cause with AI, and routes it to the right recovery action automatically.
+- **Live uplift card** (only shown if a batch has run): displays the real `+X.X pts uplift vs baseline` and `₹XX,XXX recovered` pulled live from `GET /api/summary`. This number is never hardcoded.
+- **4-step core loop row**: Detect → Classify → Decide → Recover, with per-step icons and a one-line descriptor.
+- **Two CTAs**: "Open dashboard" and "Watch it live".
+
+### What to say while it's on screen
+> *"Every Indian merchant loses a percentage of their GMV to silent payment failures. Recovr is an autonomous recovery agent — it detects failures in real time, classifies the root cause across six categories using a hybrid rules-plus-LLM engine, routes each one to the highest-confidence recovery action, and does all of this with a compliance gate that never auto-retries fraud and never contacts DND customers. In this live batch, we recovered ₹[X] in revenue that would have been written off — [X] percentage points above what a naive retry system achieves."*
+
+### Transition
+Click **"Open dashboard"** → seamless route to `/dashboard` with the AppShell layout, header, and sidebar sliding in. No dead ends.
+
+---
+
+
 ## 🎯 Master Demo Matrix (Ready for Pitch Video)
 
 | Judging Criterion | Key Pitch Moments | What to Show in UI / CLI | Why It Wins the Hackathon |

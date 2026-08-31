@@ -18,7 +18,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
   const navItems = [
     {
       name: 'Dashboard',
-      path: '/',
+      path: '/dashboard',
       icon: LayoutDashboard,
     },
     {

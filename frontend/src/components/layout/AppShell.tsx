@@ -5,7 +5,7 @@ import { Header } from './Header';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const routeTitles: Record<string, { title: string; subtitle: string }> = {
-  '/': {
+  '/dashboard': {
     title: 'Revenue Recovery Dashboard',
     subtitle: 'Real-time recovery metrics, root cause detection, and baseline uplift comparison',
   },
