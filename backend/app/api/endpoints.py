@@ -58,7 +58,7 @@ def get_summary(
 
     tx_ids = [tx.id for tx in txs]
     baselines = db.query(BaselineResult).filter(BaselineResult.transaction_id.in_(tx_ids)).all() if tx_ids else []
-    baseline_recovered = sum(b.amount_recovered for b in baselines if b.recovered)
+    baseline_recovered = sum(float(b.amount_recovered or 0) for b in baselines if b.recovered)
     baseline_rate = (baseline_recovered / total_at_risk * 100) if total_at_risk else 0.0
 
     # Break down by category
@@ -92,8 +92,8 @@ def get_summary(
 def get_transactions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    status: str = None,
-    category: str = None,
+    status: str | None = None,
+    category: str | None = None,
     limit: int = 100,
     offset: int = 0,
 ):

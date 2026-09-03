@@ -52,7 +52,8 @@ def run() -> None:
                 if settings.RAZORPAY_KEY_ID and "your_key" not in settings.RAZORPAY_KEY_ID:
                     try:
                         rzp_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
-                        resp = rzp_client.order.create({
+                        order_api = getattr(rzp_client, "order")
+                        resp = order_api.create({
                             "amount": int(tx.amount * 100),
                             "currency": tx.currency,
                             "receipt": f"baseline_{tx.id}"

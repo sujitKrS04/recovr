@@ -35,8 +35,8 @@ def generate_receipt(tx: Transaction, session: Session) -> RecoveryReceipt | Non
     decision = tx.decisions[0] if tx.decisions else None
     
     # 1. Classification part
+    cat = classification.root_cause_category.value if classification else "unknown"
     if classification:
-        cat = classification.root_cause_category.value
         conf = classification.confidence * 100
         method = classification.classifier_method.value
         class_str = f"Classified as {cat} ({conf:.0f}% confidence, {method})."
@@ -44,8 +44,8 @@ def generate_receipt(tx: Transaction, session: Session) -> RecoveryReceipt | Non
         class_str = "No classification found."
 
     # 2. Decision part
+    act = decision.action_type.value if decision else "none"
     if decision:
-        act = decision.action_type.value
         # Use reasoning if available
         if decision.reasoning:
             dec_str = f"Routed to {act}: {decision.reasoning}"

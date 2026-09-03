@@ -202,16 +202,20 @@ def build_records() -> list[dict]:
 
     idx = 0
     for cat in CATEGORIES:
-        for _ in range(cat["count"]):
+        cat_count = int(cat["count"])
+        amount_prof = str(cat["amount_profile"])
+        reasons_list = list(cat["reasons"])
+        cat_enum: RootCauseCategory = cat["category"]
+        for _ in range(cat_count):
             bank = random.choices(BANKS, weights=BANK_WEIGHTS, k=1)[0]
             records.append(
                 {
                     "external_payment_id": _payment_id(),
                     "customer_id": f"cust_{fake.uuid4()[:8]}",
                     "customer_name": fake.name(),
-                    "amount": _amount(cat["amount_profile"]),
+                    "amount": _amount(amount_prof),
                     "currency": "INR",
-                    "failure_reason": random.choice(cat["reasons"]),
+                    "failure_reason": random.choice(reasons_list),
                     "gateway": random.choice(GATEWAYS),
                     "bank": bank,
                     "status": TransactionStatus.failed,
@@ -220,7 +224,7 @@ def build_records() -> list[dict]:
                     "last_action_at": None,
                     "created_at": _timestamp(),
                     # Stash category for verification (not a DB column)
-                    "_category": cat["category"].value,
+                    "_category": cat_enum.value,
                 }
             )
             idx += 1

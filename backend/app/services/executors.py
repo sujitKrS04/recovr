@@ -23,7 +23,7 @@ from app.models.models import (
 
 logger = logging.getLogger(__name__)
 
-INJECT_FAILURE_ONCE = False
+INJECT_FAILURE_ONCE: bool = False
 
 # Initialize Razorpay Client (test mode)
 if settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET and "your_key" not in settings.RAZORPAY_KEY_ID:

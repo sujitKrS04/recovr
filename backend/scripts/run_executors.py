@@ -71,7 +71,7 @@ def run() -> None:
 
         # -- Compute Uplift vs Baseline --
         baseline_recovered_count = sum(1 for b in baseline_results if b.recovered)
-        baseline_amount = sum(float(b.amount_recovered) for b in baseline_results if b.recovered)
+        baseline_amount = sum(float(b.amount_recovered or 0) for b in baseline_results if b.recovered)
 
         uplift_amount = agent_amount_recovered - baseline_amount
         uplift_pct = (uplift_amount / baseline_amount * 100) if baseline_amount else 0.0
