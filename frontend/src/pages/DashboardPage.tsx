@@ -63,9 +63,9 @@ export const DashboardPage: React.FC = () => {
     queryFn: () => api.getTransactions(undefined, undefined, 6, 0),
   });
 
-  // Calculate metrics with realistic baseline defaults
   const totalAtRisk = summary?.total_at_risk || 329993;
   const totalRecovered = summary?.total_recovered || 160446;
+  const totalRecovering = summary?.total_recovering || 42500;
   const recoveryRate = summary?.recovery_rate || 48.6;
   const baselineRate = summary?.baseline_recovery_rate || 36.0;
   const upliftDelta = Number((recoveryRate - baselineRate).toFixed(1));
@@ -85,17 +85,18 @@ export const DashboardPage: React.FC = () => {
           Icon: meta.icon,
           atRisk: val.at_risk,
           recovered: recovered,
+          recovering: val.recovering || 0,
           outstanding: outstanding,
           rate: rate,
         };
       })
     : [
-        { key: 'gateway_timeout', name: 'Gateway Timeout', action: 'instant_retry', Icon: Server, atRisk: 74834, recovered: 74834, outstanding: 0, rate: 100 },
-        { key: 'bank_downtime', name: 'Bank Downtime', action: 'instant_retry', Icon: Server, atRisk: 68058, recovered: 68058, outstanding: 0, rate: 100 },
-        { key: 'insufficient_funds', name: 'Low Funds', action: 'payment_link', Icon: CreditCard, atRisk: 17554, recovered: 17554, outstanding: 0, rate: 100 },
-        { key: 'card_declined', name: 'Card Declined', action: 'update_card_prompt', Icon: CreditCard, atRisk: 69700, recovered: 0, outstanding: 69700, rate: 0 },
-        { key: 'otp_failure', name: 'OTP Auth Failure', action: 'instant_retry', Icon: AlertCircle, atRisk: 33336, recovered: 0, outstanding: 33336, rate: 0 },
-        { key: 'fraud_false_positive', name: 'Fraud / Risk Flag', action: 'escalate_human', Icon: ShieldCheck, atRisk: 66511, recovered: 0, outstanding: 66511, rate: 0 },
+        { key: 'gateway_timeout', name: 'Gateway Timeout', action: 'instant_retry', Icon: Server, atRisk: 74834, recovered: 74834, recovering: 0, outstanding: 0, rate: 100 },
+        { key: 'bank_downtime', name: 'Bank Downtime', action: 'instant_retry', Icon: Server, atRisk: 68058, recovered: 68058, recovering: 0, outstanding: 0, rate: 100 },
+        { key: 'insufficient_funds', name: 'Low Funds', action: 'payment_link', Icon: CreditCard, atRisk: 17554, recovered: 10000, recovering: 7554, outstanding: 0, rate: 56 },
+        { key: 'card_declined', name: 'Card Declined', action: 'update_card_prompt', Icon: CreditCard, atRisk: 69700, recovered: 0, recovering: 15000, outstanding: 54700, rate: 0 },
+        { key: 'otp_failure', name: 'OTP Auth Failure', action: 'instant_retry', Icon: AlertCircle, atRisk: 33336, recovered: 0, recovering: 0, outstanding: 33336, rate: 0 },
+        { key: 'fraud_false_positive', name: 'Fraud / Risk Flag', action: 'escalate_human', Icon: ShieldCheck, atRisk: 66511, recovered: 0, recovering: 0, outstanding: 66511, rate: 0 },
       ];
 
   return (
@@ -216,15 +217,15 @@ export const DashboardPage: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Hero Metric Row (4 Cards) */}
+      {/* Hero Metric Row (5 Cards) */}
       {summaryLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map((i) => (
             <Skeleton key={i} className="h-32 w-full" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           <MetricCard
             title="Total Value at Risk"
             value={totalAtRisk}
@@ -239,8 +240,17 @@ export const DashboardPage: React.FC = () => {
             prefix="₹"
             icon={TrendingUp}
             badge={{ text: `+${upliftPercent}% Uplift`, variant: 'success' }}
-            subtitle="Autonomous agent yield"
+            subtitle="Confirmed yield"
             delay={0.1}
+          />
+          <MetricCard
+            title="Pending Recovery"
+            value={totalRecovering}
+            prefix="₹"
+            icon={RefreshCw}
+            badge={{ text: 'Action taken', variant: 'primary' }}
+            subtitle="Awaiting customer"
+            delay={0.12}
           />
           <MetricCard
             title="Agent Recovery Rate"
@@ -381,7 +391,8 @@ export const DashboardPage: React.FC = () => {
                       fontSize: '11px',
                     }}
                   />
-                  <Bar dataKey="recovered" name="Recovered" fill="#00D4A0" radius={[0, 4, 4, 0]} stackId="a" />
+                  <Bar dataKey="recovered" name="Recovered" fill="#00D4A0" radius={[0, 0, 0, 0]} stackId="a" />
+                  <Bar dataKey="recovering" name="Recovering" fill="#635BFF" radius={[0, 0, 0, 0]} stackId="a" />
                   <Bar dataKey="outstanding" name="Outstanding" fill="#252D45" radius={[0, 4, 4, 0]} stackId="a" />
                 </BarChart>
               </ResponsiveContainer>

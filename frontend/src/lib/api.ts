@@ -19,6 +19,7 @@ const API_BASE = 'http://localhost:8000';
 export interface SummaryData {
   total_at_risk: number;
   total_recovered: number;
+  total_recovering: number;
   recovery_rate: number;
   baseline_recovery_rate: number;
   categories: Record<
@@ -26,6 +27,7 @@ export interface SummaryData {
     {
       total: number;
       recovered: number;
+      recovering: number;
       at_risk: number;
     }
   >;
@@ -277,6 +279,12 @@ export const api = {
   async simulateFailure(): Promise<{ message: string }> {
     const res = await authFetch('/api/simulate-failure', { method: 'POST' });
     if (!res.ok) throw new Error('Failed to simulate failure');
+    return res.json();
+  },
+
+  async simulatePaymentConfirmation(transactionId: number): Promise<{ message: string }> {
+    const res = await authFetch(`/api/simulate-payment-confirmation/${transactionId}`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to simulate payment confirmation');
     return res.json();
   },
 };

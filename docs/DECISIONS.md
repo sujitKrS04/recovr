@@ -458,3 +458,26 @@ The frontend makes credentialed cross-origin requests (the `httpOnly` refresh to
 
 ### Result
 `app/main.py` sets `allow_origins=["http://localhost:5173"]`, `allow_credentials=True`, `allow_methods=["*"]`, `allow_headers=["*"]`. All credentialed frontend requests succeed. Preflight `OPTIONS` responses carry the correct `Access-Control-Allow-Origin` header.
+
+---
+
+## Decision #017 — Asynchronous "recovering" state and simulated webhooks
+**Date:** 2026-09-03
+**Area:** Architecture / Business Logic
+
+### Decision
+Introduced a distinct `recovering` state for transactions where an asynchronous recovery action (e.g., `payment_link`, `update_card_prompt`) has been executed but the customer has not yet completed the payment. Added `POST /api/simulate-payment-confirmation/{id}` to simulate the asynchronous Razorpay `payment.captured` webhook.
+
+### Context
+Initially, the pipeline marked transactions as `recovered` the moment a payment link was successfully created via the Razorpay API. This inflated the "Revenue Recovered" metric, falsely presenting sent links as collected cash. Fintech applications must strictly differentiate between an action taken and revenue captured.
+
+### Alternatives considered
+- **Hardcode a delayed transition in the executor**: A background `asyncio.sleep()` in the executor that eventually marks it as recovered. Rejected because it ties up backend concurrency and misrepresents how event-driven webhook architectures work in production.
+- **Poll Razorpay API**: Polling the payment link status. Unnecessary for the buildathon demo context.
+
+### Why we chose this
+- **Architectural accuracy**: Models the real-world flow of asynchronous payments where the initial API call returns success for the *action* (link created), but the *recovery* relies on an out-of-band webhook.
+- **Demo credibility**: Prevents inflation of the headline metric. By exposing "Pending Recovery" explicitly in the UI and simulating a realistic conversion rate (~70% after 3s) during the batch run, we demonstrate a deeper understanding of fintech state machines.
+
+### Result
+The `executors.py` module now transitions async actions to `recovering`. The dashboard displays a "Pending Recovery" metric alongside "Revenue Recovered". The batch pipeline automatically triggers the webhook simulation endpoint for a subset of transactions, bringing the pipeline behavior in line with real-world expectations.

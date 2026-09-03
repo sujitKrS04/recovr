@@ -50,6 +50,11 @@ Click **"Open dashboard"** → seamless route to `/dashboard` with the AppShell 
 - **What happens:** Compares the AI agent's intelligent routing against a naive blind single-retry baseline.
 - **Why it matters:** Comparing recovery to $0 is intellectually dishonest. Businesses already do naive retries. Proving a **+35.1% revenue lift** over existing merchant logic demonstrates pure business value.
 
+### 1.3 Asynchronous State Modeling (Phase 12)
+- **What to show:** During the batch run, watch the "Pending Recovery" metric increase for link/prompt actions, then observe transactions transition to "Recovered" ~3 seconds later.
+- **What happens:** The agent correctly isolates actions requiring customer interaction (like payment links) into a `recovering` state, and relies on an asynchronous webhook simulation (`POST /api/simulate-payment-confirmation/{id}`) to mark them as `recovered`.
+- **Why it matters:** In fintech, sending a link is not the same as collecting cash. Demonstrating that the system accurately models pending states and asynchronous webhooks proves a deep, mature understanding of real-world payment flows, completely neutralizing the risk of inflating "Recovered Revenue" metrics.
+
 ---
 
 ## 🛠️ Criterion 2 — Build Quality

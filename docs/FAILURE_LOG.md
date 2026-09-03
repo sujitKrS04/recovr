@@ -4,6 +4,34 @@ This document tracks all meaningful technical failures, how they were detected, 
 
 ---
 
+## Failure #015 — "Recovered" revenue metric inflated by counting async action executions instead of confirmed payments
+**Date:** 2026-09-03
+**Phase:** Phase 12 — Final Polish & Accuracy Fixes
+**Component:** Backend / Services (`executors.py`) and Frontend Dashboard
+
+### What broke?
+The `payment_link` and `update_card_prompt` executors were marking transactions as `TransactionStatus.recovered` and incrementing the "Revenue Recovered" metric the exact moment the API call (e.g. creating the Razorpay payment link) succeeded. This was a critical logical flaw: creating a payment link does not mean the customer has paid. It inflated the headline "Revenue Recovered" metric with money that had not actually been captured.
+
+### How was it detected?
+During a final accuracy audit of the metric calculations, we realized the recovery rate was jumping to 55%+ immediately upon batch completion, even for actions that are inherently asynchronous (links sent via email/SMS).
+
+### Root cause
+A flawed simplifying assumption made during early development: "Action success = Recovery success". This holds true for `instant_retry` (which synchronously charges a saved token), but is false for any action requiring customer interaction.
+
+### What did we change?
+1. **Introduced `recovering` state:** `executors.py` now sets `tx.status = TransactionStatus.recovering` for `payment_link` and `update_card_prompt`.
+2. **Added Webhook Simulator:** Added `POST /api/simulate-payment-confirmation/{id}` to mock the asynchronous Razorpay `payment.captured` webhook.
+3. **Demo Automation:** Updated the batch pipeline to automatically simulate a ~70% conversion rate of `recovering` transactions into `recovered` transactions after a 3-second delay, so the live demo still tells a complete story without requiring manual clicks.
+4. **UI Updates:** Added a distinct "Pending Recovery" metric card and stacked bar chart segment to the dashboard to explicitly track the `recovering` state.
+
+### Why this fix?
+Intellectual honesty and judged credibility. Inflating revenue numbers by treating sent links as collected cash would immediately fail scrutiny from any fintech judge. Splitting "Pending Recovery" from "Revenue Recovered" proves the system models real-world asynchronous payment flows correctly.
+
+### Final result
+Resolved. The "Revenue Recovered" metric now strictly tracks confirmed conversions, and "Pending Recovery" accurately reflects actions awaiting customer input.
+
+---
+
 ## Failure #014 — Pyright type warnings across 6 backend files after auth phase refactor
 **Date:** 2026-09-03
 **Phase:** Phase 11 — Multi-tenant auth, RBAC, and multi-org support

@@ -54,6 +54,10 @@ def get_summary(
 
     recovered_txs = [tx for tx in txs if tx.status == TransactionStatus.recovered]
     total_recovered = sum(tx.amount for tx in recovered_txs)
+    
+    recovering_txs = [tx for tx in txs if tx.status == TransactionStatus.recovering]
+    total_recovering = sum(tx.amount for tx in recovering_txs)
+
     recovery_rate = (total_recovered / total_at_risk * 100) if total_at_risk else 0.0
 
     tx_ids = [tx.id for tx in txs]
@@ -68,16 +72,19 @@ def get_summary(
         if tx.classifications:
             cat = tx.classifications[0].root_cause_category.value
         if cat not in categories:
-            categories[cat] = {"total": 0, "recovered": 0, "at_risk": 0}
+            categories[cat] = {"total": 0, "recovered": 0, "at_risk": 0, "recovering": 0}
 
         categories[cat]["total"] += 1
         categories[cat]["at_risk"] += tx.amount
         if tx.status == TransactionStatus.recovered:
             categories[cat]["recovered"] += tx.amount
+        elif tx.status == TransactionStatus.recovering:
+            categories[cat]["recovering"] += tx.amount
 
     return {
         "total_at_risk": total_at_risk,
         "total_recovered": total_recovered,
+        "total_recovering": total_recovering,
         "recovery_rate": recovery_rate,
         "baseline_recovery_rate": baseline_rate,
         "categories": categories,
@@ -251,6 +258,61 @@ def simulate_failure(current_user: User = Depends(require_analyst_or_above)):
 
 
 # ---------------------------------------------------------------------------
+# POST /api/simulate-payment-confirmation/{transaction_id}
+# ---------------------------------------------------------------------------
+
+@router.post("/api/simulate-payment-confirmation/{transaction_id}")
+async def simulate_payment_confirmation(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Simulates a Razorpay webhook for a customer completing a payment."""
+    tx = db.query(Transaction).filter(
+        Transaction.id == transaction_id, 
+        Transaction.org_id == current_user.org_id
+    ).first()
+    
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found.")
+        
+    if tx.status != TransactionStatus.recovering:
+        raise HTTPException(status_code=400, detail="Transaction is not in recovering state.")
+        
+    tx.status = TransactionStatus.recovered
+    
+    # Update the corresponding action_log amount_recovered
+    if tx.decisions and tx.decisions[0].actions_log:
+        latest_action = tx.decisions[0].actions_log[-1]
+        latest_action.amount_recovered = tx.amount
+        
+    # Generate receipt
+    receipt = receipts.generate_receipt(tx, db)
+    db.commit()
+    
+    # Broadcast to dashboard
+    classification = tx.classifications[0] if tx.classifications else None
+    decision = tx.decisions[0] if tx.decisions else None
+    
+    from datetime import datetime
+    time_str = datetime.now().strftime("%H:%M:%S")
+    await manager.broadcast_to_org(current_user.org_id, {
+        "type": "tx_recovered_async",
+        "transaction_id": tx.id,
+        "customer_name": tx.customer_name,
+        "amount": tx.amount,
+        "category": classification.root_cause_category.value if classification else "unknown",
+        "action": decision.action_type.value if decision else "unknown",
+        "status": tx.status.value,
+        "success": True,
+        "reasoning": receipt.reasoning if receipt else "Payment completed successfully.",
+        "timestamp": time_str,
+    })
+    
+    return {"message": "Payment confirmed and transaction recovered."}
+
+
+# ---------------------------------------------------------------------------
 # Background batch pipeline
 # ---------------------------------------------------------------------------
 
@@ -374,6 +436,43 @@ async def _run_batch_pipeline(org_id: int):
             })
 
             await asyncio.sleep(0.06)
+            
+        # Demo Auto-Simulation: convert ~70% of 'recovering' to 'recovered' after a short delay
+        recovering_txs = [tx for tx in txs if tx.status == TransactionStatus.recovering]
+        if recovering_txs:
+            await asyncio.sleep(3.0) # Simulate customer dwell time
+            import random
+            
+            # Select 70% to simulate payment completion
+            num_to_convert = int(len(recovering_txs) * 0.70)
+            txs_to_convert = random.sample(recovering_txs, num_to_convert)
+            
+            for tx in txs_to_convert:
+                tx.status = TransactionStatus.recovered
+                if tx.decisions and tx.decisions[0].actions_log:
+                    tx.decisions[0].actions_log[-1].amount_recovered = tx.amount
+                    
+                receipt = receipts.generate_receipt(tx, db)
+                db.commit()
+                
+                c_res = tx.classifications[0] if tx.classifications else None
+                d_res = tx.decisions[0] if tx.decisions else None
+                
+                time_str = datetime.now().strftime("%H:%M:%S")
+                await manager.broadcast_to_org(org_id, {
+                    "type": "tx_recovered_async",
+                    "transaction_id": tx.id,
+                    "customer_name": tx.customer_name,
+                    "amount": tx.amount,
+                    "category": c_res.root_cause_category.value if c_res else "unknown",
+                    "action": d_res.action_type.value if d_res else "unknown",
+                    "status": tx.status.value,
+                    "success": True,
+                    "reasoning": receipt.reasoning if receipt else "Customer completed payment via link/prompt.",
+                    "timestamp": time_str,
+                })
+                await asyncio.sleep(0.15)
+
     finally:
         db.close()
 

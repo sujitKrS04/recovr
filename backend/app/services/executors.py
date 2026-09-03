@@ -109,8 +109,8 @@ def execute_payment_link(tx: Transaction, decision: Decision, session: Session) 
     """
     if not rzp_client:
         # Mock success for demo if keys not set
-        _mark_recovered(tx, tx.amount)
-        return _log_action(session, decision.id, True, rzp_response={"id": "mock_plink_123", "mock": True}, amount_recovered=tx.amount)
+        tx.status = TransactionStatus.recovering
+        return _log_action(session, decision.id, True, rzp_response={"id": "mock_plink_123", "mock": True})
 
     amount_paise = int(tx.amount * 100)
     payload = {
@@ -132,9 +132,8 @@ def execute_payment_link(tx: Transaction, decision: Decision, session: Session) 
         resp = plink_api.create(payload)
         if "id" in resp:
             # We treat sending the link as an action success, but the TX is still 'recovering' until paid.
-            # For the buildathon demo, we will simulate immediate recovery if the link was created successfully.
-            _mark_recovered(tx, tx.amount)
-            return _log_action(session, decision.id, True, rzp_response=resp, amount_recovered=tx.amount)
+            tx.status = TransactionStatus.recovering
+            return _log_action(session, decision.id, True, rzp_response=resp)
         else:
             _mark_failed(tx)
             return _log_action(session, decision.id, False, rzp_response=resp, error_message="No ID returned for link.")
@@ -149,8 +148,8 @@ def execute_update_card_prompt(tx: Transaction, decision: Decision, session: Ses
     """
     # Mocking success always for this demo
     resp = {"status": "sent", "channel": "sms", "mock": True}
-    _mark_recovered(tx, tx.amount)
-    return _log_action(session, decision.id, True, rzp_response=resp, amount_recovered=tx.amount)
+    tx.status = TransactionStatus.recovering
+    return _log_action(session, decision.id, True, rzp_response=resp)
 
 
 def execute_escalate_human(tx: Transaction, decision: Decision, session: Session) -> ActionLog:
