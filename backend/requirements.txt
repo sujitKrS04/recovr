@@ -10,6 +10,9 @@ httpx==0.28.1
 razorpay==1.4.2
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 apscheduler==3.11.0
 faker==37.4.0
-razorpay==1.4.1
+python-multipart==0.0.20
+slowapi==0.1.10
+email-validator==2.3.0

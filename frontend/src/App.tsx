@@ -1,9 +1,13 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from './context/AuthContext';
 import { LiveEventsProvider } from './context/LiveEventsContext';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AppShell } from './components/layout/AppShell';
 import { LandingPage } from './pages/LandingPage';
+import { LoginPage } from './pages/LoginPage';
+import { SignupPage } from './pages/SignupPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LiveFeedPage } from './pages/LiveFeedPage';
 import { ReviewQueuePage } from './pages/ReviewQueuePage';
@@ -14,6 +18,11 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       staleTime: 5000,
+      retry: (failureCount, error: any) => {
+        // Don't retry on 401 — authFetch already handles one refresh
+        if (error?.status === 401) return false;
+        return failureCount < 2;
+      },
     },
   },
 });
@@ -21,23 +30,40 @@ const queryClient = new QueryClient({
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <LiveEventsProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Landing page — outside the AppShell, no sidebar/header */}
-            <Route path="/" element={<LandingPage />} />
+      <AuthProvider>
+        <LiveEventsProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* ── Public routes ──────────────────────────────────────── */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
 
-            {/* Product shell — all inner routes share the AppShell layout */}
-            <Route element={<AppShell />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/live" element={<LiveFeedPage />} />
-              <Route path="/review-queue" element={<ReviewQueuePage />} />
-              <Route path="/receipts" element={<ReceiptsPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </LiveEventsProvider>
+              {/* ── Protected product shell ────────────────────────────── */}
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <AppShell />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/live" element={<LiveFeedPage />} />
+                <Route
+                  path="/review-queue"
+                  element={
+                    <ProtectedRoute requiredRole="analyst">
+                      <ReviewQueuePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/receipts" element={<ReceiptsPage />} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </LiveEventsProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

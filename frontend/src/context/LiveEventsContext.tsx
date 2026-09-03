@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { useAuth } from './AuthContext';
 
 export interface LiveEvent {
   id: string;
@@ -63,8 +64,12 @@ export const LiveEventsProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     amount: 0,
     totalTx: 0,
   });
+  const { user } = useAuth();
 
   const connectWebSocket = () => {
+    // Don't connect until we know the user's org_id
+    if (!user?.org_id) return;
+    const WS_URL = `ws://localhost:8000/ws/live?org_id=${user.org_id}`;
     try {
       const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
@@ -150,12 +155,13 @@ export const LiveEventsProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   useEffect(() => {
+    if (!user?.org_id) return;
     connectWebSocket();
     return () => {
       if (wsRef.current) wsRef.current.close();
       if (isRunningTimerRef.current) clearTimeout(isRunningTimerRef.current);
     };
-  }, []);
+  }, [user?.org_id]);
 
   const runBatch = async () => {
     try {

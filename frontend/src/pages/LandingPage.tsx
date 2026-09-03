@@ -108,14 +108,14 @@ export const LandingPage: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             id="landing-login-btn"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/login')}
             className="px-4 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground border border-border/50 hover:border-border rounded-lg transition-all duration-150"
           >
             Log in
           </button>
           <button
             id="landing-signup-btn"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/signup')}
             className="px-4 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all duration-150 shadow-[0_0_12px_rgba(99,91,255,0.3)] hover:shadow-[0_0_20px_rgba(99,91,255,0.45)]"
           >
             Sign up

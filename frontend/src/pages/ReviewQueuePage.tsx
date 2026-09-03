@@ -7,19 +7,23 @@ import {
   X, 
   AlertTriangle,
   Info,
-  Sparkles
+  Sparkles,
+  EyeOff
 } from 'lucide-react';
 import { api, ReviewQueueItem } from '../lib/api';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { motion } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
 
 export const ReviewQueuePage: React.FC = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { data: queueData, isLoading } = useQuery({
     queryKey: ['reviewQueue'],
     queryFn: api.getReviewQueue,
   });
 
+  const canAct = user?.role === 'admin' || user?.role === 'analyst';
   const [handledIds, setHandledIds] = useState<number[]>([]);
 
   const handleApprove = (txId: number) => {
@@ -177,20 +181,29 @@ export const ReviewQueuePage: React.FC = () => {
 
                 {/* Human Approval Action Buttons */}
                 <div className="flex sm:flex-row lg:flex-col gap-2 flex-shrink-0 self-end lg:self-center">
-                  <button
-                    onClick={() => handleApprove(item.transaction_id)}
-                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-success hover:bg-success/90 text-success-foreground text-xs font-medium transition-colors shadow-sm cursor-pointer"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    Approve Outreach
-                  </button>
-                  <button
-                    onClick={() => handleDismiss(item.transaction_id)}
-                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-medium transition-colors cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    Dismiss / Suppress
-                  </button>
+                  {canAct ? (
+                    <>
+                      <button
+                        onClick={() => handleApprove(item.transaction_id)}
+                        className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-success hover:bg-success/90 text-success-foreground text-xs font-medium transition-colors shadow-sm cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        Approve Outreach
+                      </button>
+                      <button
+                        onClick={() => handleDismiss(item.transaction_id)}
+                        className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-medium transition-colors cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Dismiss / Suppress
+                      </button>
+                    </>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-muted text-muted-foreground text-xs">
+                      <EyeOff className="w-3.5 h-3.5" />
+                      Awaiting review
+                    </span>
+                  )}
                 </div>
               </div>
             </motion.div>

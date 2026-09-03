@@ -1,28 +1,44 @@
 """
-WebSocket manager for broadcasting live updates.
-"""
+WebSocket manager — supports per-org isolated broadcast channels.
 
-from typing import List
+Clients connect with ?org_id=<id> so that a batch run for org A does not
+bleed events into org B's live feed.
+"""
+from collections import defaultdict
+from typing import Dict, List
+
 from fastapi import WebSocket
 
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        # org_id → list of active WebSocket connections
+        self._connections: Dict[int, List[WebSocket]] = defaultdict(list)
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, org_id: int) -> None:
         await websocket.accept()
-        self.active_connections.append(websocket)
+        self._connections[org_id].append(websocket)
 
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+    def disconnect(self, websocket: WebSocket, org_id: int) -> None:
+        conns = self._connections.get(org_id, [])
+        if websocket in conns:
+            conns.remove(websocket)
 
-    async def broadcast(self, message: dict):
-        for connection in self.active_connections:
+    async def broadcast_to_org(self, org_id: int, message: dict) -> None:
+        """Send a JSON message to all connections belonging to this org."""
+        dead: List[WebSocket] = []
+        for connection in list(self._connections.get(org_id, [])):
             try:
                 await connection.send_json(message)
             except Exception:
-                pass
+                dead.append(connection)
+        for ws in dead:
+            self.disconnect(ws, org_id)
+
+    async def broadcast(self, message: dict) -> None:
+        """Broadcast to ALL connected clients (legacy / debug use only)."""
+        for org_id in list(self._connections.keys()):
+            await self.broadcast_to_org(org_id, message)
+
 
 manager = ConnectionManager()

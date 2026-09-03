@@ -1,5 +1,5 @@
 """
-Recovr SQLAlchemy models — all 6 tables for Phase 1.
+Recovr SQLAlchemy models — all 6 tables for Phase 1 + multi-tenant org_id.
 """
 from datetime import datetime
 import enum
@@ -22,6 +22,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+# Import auth models so Alembic sees them in Base.metadata
+import app.models.auth_models  # noqa: F401
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +77,10 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    # org_id — nullable so existing rows survive until re-seeded
+    org_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     external_payment_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
     customer_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     customer_name: Mapped[str] = mapped_column(String(256), nullable=False)

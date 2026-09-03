@@ -11,5 +11,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "dev-secret-change-in-production"
     ENVIRONMENT: str = "development"
 
+    # JWT / Auth
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    JWT_ALGORITHM: str = "HS256"
+
 
 settings = Settings()
