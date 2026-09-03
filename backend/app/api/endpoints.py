@@ -71,9 +71,9 @@ def get_summary(
             categories[cat] = {"total": 0, "recovered": 0, "at_risk": 0}
 
         categories[cat]["total"] += 1
-        categories[cat]["at_risk"] += float(tx.amount)
+        categories[cat]["at_risk"] += tx.amount
         if tx.status == TransactionStatus.recovered:
-            categories[cat]["recovered"] += float(tx.amount)
+            categories[cat]["recovered"] += tx.amount
 
     return {
         "total_at_risk": total_at_risk,
@@ -162,11 +162,11 @@ def get_all_receipts(
             "id": r.id,
             "transaction_id": r.transaction_id,
             "customer_name": tx.customer_name if tx else "Unknown",
-            "amount": float(tx.amount) if tx else 0,
+            "amount": tx.amount if tx else 0,
             "root_cause": r.root_cause,
             "action_taken": r.action_taken,
             "reasoning": r.reasoning,
-            "amount_recovered": float(r.amount_recovered) if r.amount_recovered else None,
+            "amount_recovered": r.amount_recovered if r.amount_recovered else None,
             "outcome": r.outcome.value if hasattr(r.outcome, "value") else str(r.outcome),
             "generated_at": str(r.generated_at),
         })
@@ -199,11 +199,11 @@ def get_receipt(
         "id": receipt.id,
         "transaction_id": receipt.transaction_id,
         "customer_name": tx.customer_name,
-        "amount": float(tx.amount),
+        "amount": tx.amount,
         "root_cause": receipt.root_cause,
         "action_taken": receipt.action_taken,
         "reasoning": receipt.reasoning,
-        "amount_recovered": float(receipt.amount_recovered) if receipt.amount_recovered else None,
+        "amount_recovered": receipt.amount_recovered if receipt.amount_recovered else None,
         "outcome": receipt.outcome.value if hasattr(receipt.outcome, "value") else str(receipt.outcome),
         "generated_at": str(receipt.generated_at),
     }
@@ -230,7 +230,7 @@ def get_review_queue(
         queue.append({
             "transaction_id": tx.id,
             "customer_name": tx.customer_name,
-            "amount": float(tx.amount),
+            "amount": tx.amount,
             "failure_reason": tx.failure_reason,
             "category": classification.root_cause_category.value if classification else "fraud_false_positive",
             "confidence": classification.confidence if classification else 0.1,
@@ -276,7 +276,7 @@ async def _run_batch_pipeline(org_id: int):
                 "type": "tx_classified",
                 "transaction_id": tx.id,
                 "customer_name": tx.customer_name,
-                "amount": float(tx.amount),
+                "amount": tx.amount,
                 "failure_reason": tx.failure_reason,
                 "category": c_res.root_cause_category.value,
                 "confidence": c_res.confidence,
@@ -290,7 +290,7 @@ async def _run_batch_pipeline(org_id: int):
                 "type": "tx_decided",
                 "transaction_id": tx.id,
                 "customer_name": tx.customer_name,
-                "amount": float(tx.amount),
+                "amount": tx.amount,
                 "failure_reason": tx.failure_reason,
                 "category": c_res.root_cause_category.value,
                 "confidence": c_res.confidence,
@@ -315,7 +315,7 @@ async def _run_batch_pipeline(org_id: int):
                     "type": "tx_failed_injected",
                     "transaction_id": tx.id,
                     "customer_name": tx.customer_name,
-                    "amount": float(tx.amount),
+                    "amount": tx.amount,
                     "category": c_res.root_cause_category.value,
                     "confidence": c_res.confidence,
                     "action": d_res.action_type.value,
@@ -340,7 +340,7 @@ async def _run_batch_pipeline(org_id: int):
                     "type": "tx_retried_recovered",
                     "transaction_id": tx.id,
                     "customer_name": tx.customer_name,
-                    "amount": float(tx.amount),
+                    "amount": tx.amount,
                     "category": c_res.root_cause_category.value,
                     "confidence": c_res.confidence,
                     "action": d_res.action_type.value,
@@ -362,7 +362,7 @@ async def _run_batch_pipeline(org_id: int):
                 "type": "tx_executed",
                 "transaction_id": tx.id,
                 "customer_name": tx.customer_name,
-                "amount": float(tx.amount),
+                "amount": tx.amount,
                 "category": c_res.root_cause_category.value,
                 "confidence": c_res.confidence,
                 "action": d_res.action_type.value,

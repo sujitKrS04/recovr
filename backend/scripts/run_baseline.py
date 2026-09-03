@@ -68,7 +68,7 @@ def run() -> None:
 
             if is_recovered:
                 recovered_count += 1
-                amount_recovered += float(tx.amount)
+                amount_recovered += tx.amount
 
             baseline = BaselineResult(
                 transaction_id=tx.id,
