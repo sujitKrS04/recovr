@@ -71,6 +71,12 @@ Click **"Open dashboard"** → seamless route to `/dashboard` with the AppShell 
 - **What happens:** The dashboard comes alive: live progress banner animates, events stream row-by-row via WebSocket (`/ws/live`), numbers count up smoothly, and Recharts line curve updates dynamically.
 - **Why it matters:** Zero polling overhead; provides high-fidelity observability during merchant operations.
 
+### 2.4 Zero-Storage Token Security & In-Memory Auth (Phase 11)
+- **What to show:** Open Browser DevTools → Application tab → show empty `localStorage` and `sessionStorage` while logged in.
+- **Script Talking Point (Say on camera):**
+  > *"We store short-lived access tokens strictly in memory — never in `localStorage` — specifically to close the XSS token-exfiltration vector. The refresh token lives in an `httpOnly` cookie, so no JavaScript on the page can ever read it by design. (See [`docs/DECISIONS.md #014`](DECISIONS.md#decision-014--access-token-stored-in-js-memory-explicit-xss-tradeoff))."*
+- **Why it matters:** Proves institutional fintech security posture. Prevents XSS token theft without degrading session continuity across reloads.
+
 ---
 
 ## 🧠 Criterion 3 — AI Judgment
