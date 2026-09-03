@@ -4,6 +4,76 @@ This document tracks all meaningful technical failures, how they were detected, 
 
 ---
 
+## Failure #014 — Pyright type warnings across 6 backend files after auth phase refactor
+**Date:** 2026-09-03
+**Phase:** Phase 11 — Multi-tenant auth, RBAC, and multi-org support
+**Component:** Backend / Pyright static analysis
+
+### What broke?
+After the auth and multi-tenant refactor landed in commit `c7da2e6`, Pyright reported type warnings across six backend files: `endpoints.py`, `executors.py`, `receipts.py`, `generate_batch.py`, `run_baseline.py`, and `run_executors.py`. The warnings were:
+- `float(tx.amount)` called on a `Numeric` SQLAlchemy column type, which Pyright typed as `Decimal | None`; wrapping in `float()` was redundant and masked the `None` case.
+- Variables assigned inside conditional branches used before assignment in paths Pyright could not prove converge.
+- `Optional[int]` return types on functions that sometimes returned bare `int` without a `None` branch.
+- `razorpay.Client` attribute access (`client.payment`) not typed in the stub, causing `reportAttributeAccessIssue`.
+
+### How was it detected?
+VS Code Pyright language server flagged the warnings inline. A `pyrightconfig.json` was added to point Pyright at the `.venv` interpreter, which activated the full type check pass.
+
+### Root cause
+The pre-auth codebase was written without strict Pyright configuration. Adding `pyrightconfig.json` with `"venvPath": ".venv"` surfaced latent type issues that had always been there but were not previously reported.
+
+### What did we change?
+- Removed redundant `float()` wraps — let SQLAlchemy return `Decimal` directly (JSON serialization handles it).
+- Added explicit `None` guards and initialized variables before conditional branches.
+- Added `# type: ignore[attr-defined]` annotations on the untyped `razorpay` SDK attributes.
+- Initialized `retry_log` assignment in the `executors.py` conditional to satisfy definite-assignment check.
+
+### Why this fix?
+Addresses the actual type issues rather than suppressing them wholesale. The `float()` removal is also a small correctness improvement — `Decimal` preserves precision; `float()` truncates.
+
+### Final result
+Resolved. Pyright reports zero errors with `pyrightconfig.json` active. Fixed in commit `c677ad8`.
+
+---
+
+## Failure #013 — Background task DB session closed mid-pipeline for Globex (2nd org) batch
+**Date:** 2026-09-03
+**Phase:** Phase 11 — Multi-tenant auth, RBAC, and multi-org support
+**Component:** Backend / app/api/endpoints.py / FastAPI BackgroundTasks
+
+### What broke?
+After adding org-scoped authentication, running the batch pipeline for the second org (Globex Inc, `org_id=2`) caused the background task to crash silently. The WebSocket feed connected but emitted no events after `tx_classified` for the first transaction. The backend Uvicorn log showed `sqlalchemy.orm.exc.DetachedInstanceError: Instance <Transaction at 0x...> is not bound to a Session` partway through the pipeline loop.
+
+### How was it detected?
+Ran the batch for Globex via the UI. The live feed showed the batch starting (progress banner appeared) but no transaction events streamed. Checked the Uvicorn terminal — found `DetachedInstanceError` stacktrace in the background task coroutine.
+
+### Root cause
+`POST /api/run-batch` received `db: Session = Depends(get_db)` as a FastAPI dependency. FastAPI's `get_db` dependency uses a `yield`-based generator that closes the session when the HTTP response is sent. The background task (`_run_batch_pipeline`) ran *after* the HTTP response had been returned, at which point the `db` session was already closed. Any attempt to access lazy-loaded SQLAlchemy relationships on transaction objects (`tx.decisions`, `tx.classifications`) raised `DetachedInstanceError` because the ORM session no longer existed.
+
+This did not surface on the first org (Acme Corp, `org_id=1`) during initial testing because those tests were run before the `Depends(get_db)` session lifetime was examined carefully. The second-org run hit it consistently because the batch was run after deployment of the auth layer, which changed the request lifecycle.
+
+### What did we change?
+Removed `db: Session = Depends(get_db)` from the parameters passed into `_run_batch_pipeline`. The background task now instantiates its own database session internally:
+
+```python
+async def _run_batch_pipeline(org_id: int, ...):
+    db = SessionLocal()
+    try:
+        ...  # pipeline runs on db
+    finally:
+        db.close()
+```
+
+The HTTP endpoint passes only non-session context (org_id, manager reference) to the background task.
+
+### Why this fix?
+FastAPI's dependency-injected sessions are request-scoped. Background tasks outlive the request. Background tasks that need database access must own their own `SessionLocal()` instance and close it themselves.
+
+### Final result
+Resolved. Both Acme and Globex batch pipelines run to completion with full WebSocket event streaming. The `finally: db.close()` block ensures the session is closed even if the pipeline raises an exception mid-run. Fixed as part of commit `c7da2e6`.
+
+---
+
 ## Failure #012 — Unignored local environment file and loose debugging scripts in backend root
 **Date:** 2026-08-31
 **Phase:** Phase 10 — Polish, responsive pass, and demo prep

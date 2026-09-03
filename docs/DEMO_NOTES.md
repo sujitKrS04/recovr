@@ -143,3 +143,59 @@ All 11 technical failures encountered during development were recorded in [`docs
 5. **Self-Healing Failure Recovery & Close (2:30 – 3:00)**:
    - Hit "Simulate Failure" and show the amber detected issue automatically retrying and recovering.
    - "Recovr: +35.1% revenue uplift, 100% compliance, zero fraud auto-execution."
+
+---
+
+## 🎬 Demo Note — Landing Page as Pitch Video Opening Beat
+
+> *Navigate to `http://localhost:5173` before starting the screen recording. The landing page is the first thing judges see — it sets the tone.*
+
+### What's on screen
+- **Headline + problem statement**: "Stop losing revenue to failed payments." One sentence underneath explaining what Recovr does.
+- **Live uplift card** (centre-stage): Shows real values pulled from `GET /api/summary` — the `+X.X pts uplift vs baseline` and `₹XX,XXX recovered` numbers. **This number is never hardcoded.** If no batch has been run yet, the card shows a prompt to run the first batch. If a batch has been run, it reflects the actual pipeline output from the database.
+- **4-step loop row**: Detect → Classify → Decide → Recover, with per-step icons explaining the pipeline at a glance.
+
+### What to say while it's on screen
+> *"Every Indian merchant silently loses revenue to failed payments every day. Most teams run blind retries and write off the rest. Recovr is an autonomous recovery agent that intercepts every failed transaction, classifies the root cause with a hybrid rules-plus-LLM engine, and routes each one to the highest-confidence recovery action — with a compliance gate that never auto-retries fraud and never contacts DND customers. The number you see here — ₹[X] recovered, [X] percentage points above a naive retry baseline — is live. It comes from the database. It is not a mock."*
+
+### Why it matters for the demo
+The uplift card being live (not hardcoded) is a credibility signal. If a judge refreshes the page or runs the batch themselves and sees the number change, it proves the system is real. Mention this explicitly: **"That number updates every time a batch runs."**
+
+### Transition
+Click **"Open dashboard"** → route to `/dashboard` with the AppShell, sidebar, and KPI cards. No dead ends, no loading screens.
+
+---
+
+## 🔐 Demo Note — Login/Signup Flow and RBAC as Build Quality + AI Judgment Proof Point
+
+> *Demonstrate this after the dashboard run — after judges have seen the batch work — to show the system is multi-tenant and permission-enforced.*
+
+### What to show
+
+**Step 1 — Sign in as admin (Acme Corp)**
+- Navigate to `/login`. Show the login form. Sign in as `admin@acme.com`.
+- The header shows the user pill: `admin@acme.com · admin` with a purple "admin" role badge.
+- All controls are visible: "Run Batch", "Simulate Failure", and review action buttons in the Review Queue.
+
+**Step 2 — Sign out and sign in as viewer**
+- Click the user pill dropdown → "Sign out".
+- Sign in as `viewer@acme.com` (viewer role).
+- The header shows the user pill with a grey "viewer" role badge.
+- **The "Run Batch" button is gone from the header.** The review action buttons (Approve / Mark as Fraud / Dismiss) are gone from the Review Queue. The dashboard is read-only.
+
+**Step 3 — Try to call the API directly (optional, for a technical audience)**
+- Open browser devtools → Network → send a raw `POST http://localhost:8000/api/run-batch` with the viewer's access token as `Authorization: Bearer <token>`.
+- The response is **HTTP 403 Forbidden**: `{"detail": "Insufficient permissions"}`.
+- This proves the enforcement is server-side, not cosmetic.
+
+### What to say
+> *"This isn't frontend UI hiding. The 'Run Batch' button disappears for a viewer because the backend `POST /api/run-batch` endpoint requires the `admin` role and returns HTTP 403 if you call it with a viewer token — even directly via curl. The frontend reflects server permissions; it doesn't define them. Roles are enforced at the API boundary."*
+
+### Why this is a Build Quality + AI Judgment proof point
+- **Build Quality**: Proper server-enforced RBAC in a fintech system is table stakes. Showing that the API returns 403 — not just that a button is hidden — demonstrates the system is architecturally correct, not cosmetically role-aware.
+- **AI Judgment**: The `analyst` role can see and action the Review Queue (where the AI has escalated uncertain transactions for human review). The `viewer` role can observe but not act. The permission model maps directly to the AI's own confidence gating — the AI escalates, a human analyst decides. The RBAC enforces that only the right human can act on the AI's escalations.
+
+### Multi-org isolation demo (optional, ~30 seconds)
+- Sign out of Acme Corp. Sign up as a new org (e.g., "Globex Inc"). Run the batch for Globex.
+- Navigate to `/dashboard` — the KPI cards show only Globex transactions. The Live Feed streams only Globex events. Switch back to Acme — Acme's data is completely separate.
+- One sentence: *"Every org is fully isolated. Acme Corp never sees Globex's transactions, receipts, or recovery events."*

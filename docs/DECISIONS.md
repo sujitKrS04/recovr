@@ -286,3 +286,175 @@ Judging criteria prioritize "Problem taste" and "Build quality". A generic SaaS 
 ### Result
 The dashboard shell and all 4 routes render with 100% build validity (`tsc && vite build` in ~10s) and fluid Framer Motion transitions across desktop and responsive viewports.
 
+---
+
+## Decision #011 — JWT access token + DB-backed refresh token pair, no server-side session store
+**Date:** 2026-09-03
+**Area:** Auth / Security
+
+### Decision
+Authenticate API calls with a short-lived JWT access token (15-minute expiry, HS256, stored in JS memory) paired with an opaque 7-day refresh token stored as a SHA-256 hash in the `refresh_tokens` table and set as an `httpOnly` cookie.
+
+### Context
+The application runs a WebSocket pipeline that fires events multiple times per second across background tasks. The auth layer needs to be fast and stateless for the hot path (classify, decide, execute) while still supporting secure session revocation (sign out from all devices, admin revoke) and multi-org isolation.
+
+### Alternatives considered
+- **Server-side sessions (Redis)**: Store session state in Redis keyed by session ID in a cookie. Fully revocable, no JWT complexity, but requires a Redis instance.
+- **Pure long-lived JWT**: Single token, no refresh. Simple, but unrevocable — a stolen token is valid until expiry. Unacceptable for a multi-tenant financial system.
+- **JWT only, no refresh**: Re-login on every 15-minute expiry. Breaks the UX of a long-running live batch demo.
+
+### Why we chose this
+- **Stateless access tokens**: The 15-minute JWT is verified on every request in microseconds with no DB round-trip — critical for the WebSocket pipeline hot path where every transaction event passes through `get_current_user`.
+- **Revocable refresh**: The refresh token is stored as a hash in PostgreSQL. Logout, password change, or admin revoke simply sets `revoked=True` — no Redis dependency.
+- **No extra infrastructure**: PostgreSQL is already present; no Redis or session store to spin up. The `refresh_tokens` table carries the whole session lifecycle.
+- **Rotation on every refresh**: Each `POST /api/auth/refresh` call issues a new refresh token and revokes the old one (rolling refresh), limiting replay attack windows to a single use.
+
+### Why we rejected the alternatives
+- Redis: Correct for production, but adds a runtime dependency that complicates local dev setup during a 5-day build.
+- Pure long-lived JWT: Non-revocable; violates the multi-tenant isolation requirement (an org admin cannot invalidate a leaked user token).
+- No refresh: Forced re-login mid-demo is unacceptable.
+
+### Result
+`app/core/security.py`, `app/api/auth_routes.py`, and `app/core/auth_deps.py` implement the full pair. Access token is minted on login/refresh, refresh token is rotated, and `get_current_user` validates the JWT on every protected endpoint.
+
+---
+
+## Decision #012 — org_id migration strategy: nullable column → application-layer enforcement
+**Date:** 2026-09-03
+**Area:** Data / Database Migration
+
+### Decision
+The Alembic migration `a3f9d1c82e4b` adds `org_id` to `transactions` as a **nullable FK** rather than `NOT NULL`. Application-layer filters (`Transaction.org_id == current_user.org_id`) enforce isolation on every query. The seed script (`seed_two_orgs.py`) explicitly sets `org_id` on every generated row.
+
+### Context
+Adding a `NOT NULL` FK column to a table with existing rows requires either a DEFAULT value (which would silently assign all old rows to a fake org) or a two-step migration (add nullable → backfill → alter column). In a buildathon with a clean DB, the risk is low, but the pattern must be correct for reproducibility.
+
+### Alternatives considered
+- **Add NOT NULL with DEFAULT org_id = 1 directly**: One migration step, but implicitly assigns all legacy rows to org 1, which is semantically wrong and could hide isolation bugs.
+- **Drop and recreate the table**: Destructive — loses all development-phase data and invalidates the revision history.
+- **Two-step migration (nullable → backfill → NOT NULL in a second migration)**: Correct and safe for production with existing data.
+
+### Why we chose this
+- The nullable-first approach is the non-destructive, production-safe pattern. It lets any pre-existing rows survive the migration without silent assignment.
+- `seed_two_orgs.py` is the single source of truth for bootstrapping multi-tenant data — it creates both orgs and explicitly sets `org_id` on every transaction row it generates.
+- The signup endpoint auto-seeds 120 starter transactions with the new org's `org_id` on registration, so the nullable window is never exploited in practice.
+- Keeps the door open for a follow-up `ALTER COLUMN org_id SET NOT NULL` once all rows are confirmed to be org-assigned.
+
+### Why we rejected the alternatives
+- NOT NULL with DEFAULT: Hides future isolation bugs by making everything appear to belong to org 1.
+- Drop and recreate: Would invalidate the existing alembic revision history.
+
+### Result
+Migration `a3f9d1c82e4b` applied cleanly. All seeded transactions carry explicit `org_id` values. Org isolation is enforced at the application layer on every endpoint via `Transaction.org_id == current_user.org_id`.
+
+---
+
+## Decision #013 — 3-tier RBAC (admin / analyst / viewer), enforced server-side via require_role()
+**Date:** 2026-09-03
+**Area:** Auth / RBAC
+
+### Decision
+Implement three roles — `admin`, `analyst`, and `viewer` — using a `UserRole` enum on the `User` model. Role enforcement is done server-side in every sensitive endpoint via a `require_role(min_role)` FastAPI dependency factory, not by hiding buttons in the frontend.
+
+### Context
+The dashboard has at least three distinct personas: the operator who runs batches and manages the org (admin), the analyst who reviews the queue and acts on escalations (analyst), and the read-only auditor or stakeholder (viewer). These roles map to a real fintech operator hierarchy.
+
+### Alternatives considered
+- **Single role (admin/not-admin)**: Simpler, but collapses the analyst use case.
+- **Frontend-only role gating**: Hide the "Run Batch" button for non-admins in the React component. Fast to ship, but the API endpoint remains unprotected — any client can call `POST /api/run-batch` directly.
+- **Permissions-based ACL (per-action permissions)**: Granular, production-grade, but requires two extra tables and a policy engine — overkill for a 5-day build.
+
+### Why we chose this
+- **Server-enforced**: `require_role("admin")` on `POST /api/run-batch` means the endpoint returns HTTP 403 for non-admins regardless of what the frontend shows. This is the only correct approach for a financial system.
+- **3-tier covers the demo**: Admin runs batches, analyst reviews escalations, viewer watches the dashboard. All three are demonstrable in the pitch.
+- **Role rank ordering**: Roles have a numeric rank (`admin=3 > analyst=2 > viewer=1`). `require_role(min_role)` allows all roles at or above the minimum — no combinatorial role checks needed.
+- **Frontend reflects, not enforces**: The `viewer` role hides the "Run Batch" button and review action buttons as a UX convenience, not as a security boundary.
+
+### Why we rejected the alternatives
+- Frontend-only gating: Security theater. The API must be the enforcer.
+- ACL: Two extra tables and a policy engine — more than the timeline allows.
+
+### Result
+`UserRole` enum (`admin`, `analyst`, `viewer`) in `auth_models.py`. `require_role()` factory in `auth_deps.py`. `POST /api/run-batch` requires `admin`. `POST /api/simulate-failure` requires `analyst`. All GET endpoints require `viewer` (any authenticated user). Review Queue action buttons hidden for `viewer` in `ReviewQueuePage.tsx`.
+
+---
+
+## Decision #014 — Access token stored in JS memory: explicit XSS tradeoff
+**Date:** 2026-09-03
+**Area:** Auth / Security / Tradeoffs
+
+### Decision
+Store the 15-minute JWT access token in a module-level JavaScript variable (`let _accessToken` in `src/lib/api.ts`) — not in `localStorage`, `sessionStorage`, or a cookie.
+
+### Context
+The canonical options for SPA access token storage are: `localStorage` (persistent, convenient, XSS-readable via `window.localStorage`), `sessionStorage` (tab-scoped, still XSS-readable), `httpOnly` cookie (XSS-safe, requires BFF or same-origin server), or JS memory (not XSS-readable via storage APIs, lost on page reload). The refresh token is already in an `httpOnly` cookie. The access token needs to be available to `authFetch` without a server round-trip.
+
+### The explicit tradeoff — stated plainly
+- **In-memory is safer than localStorage**: An injected script cannot read module-level variables via storage APIs. The token cannot be exfiltrated by reading `localStorage` or `sessionStorage`.
+- **In-memory is NOT XSS-proof**: A script injected into the same JS execution context can intercept the token at call time (e.g., monkey-patching `fetch`). It is safer, not safe.
+- **The real XSS risk is in the React app itself**: Any `dangerouslySetInnerHTML` or unsafe third-party dependency is the actual attack surface. Recovr has none.
+- **On page reload, the access token is lost**: `AuthContext` handles this by calling `POST /api/auth/refresh` on mount, re-issuing a new access token from the `httpOnly` refresh token cookie. The access token never touches disk.
+
+### Why we chose this over localStorage
+- `localStorage` persists across tabs and sessions. Any XSS payload can exfiltrate it. In-memory tokens are tab-scoped and heap-resident only.
+
+### Why we did NOT use a BFF/token proxy
+- Correct for production (via Next.js, Remix, or a dedicated auth proxy server), but requires an additional server layer not in scope for a 5-day build.
+
+### Result
+`src/lib/api.ts` holds `let _accessToken: string | null = null`. `setAccessToken()` is called only from `AuthContext.tsx` on login and refresh. All `authFetch` calls read it from closure. In a production deployment, a BFF proxy issuing all tokens as `httpOnly` cookies would be the recommended upgrade.
+
+---
+
+## Decision #015 — WebSocket org isolation via ?org_id= query parameter
+**Date:** 2026-09-03
+**Area:** Auth / WebSocket / Architecture
+
+### Decision
+The WebSocket connection at `/ws/live` receives the client's org context via an `?org_id=<id>` query parameter, not via an `Authorization: Bearer` header or JWT token in the URL.
+
+### Context
+Browser WebSocket APIs (`new WebSocket(url)`) do not support setting custom headers on the upgrade handshake. The `Authorization` header cannot be sent by the browser's native WebSocket client — this is a known, long-standing limitation of the WebSocket specification.
+
+### Alternatives considered
+- **Authorization header**: Not possible with browser WebSocket API. Only available in Node.js `ws` library or server-to-server clients.
+- **First-message auth**: Connect the WebSocket without auth, then send `{"type": "auth", "token": "..."}` as the first message and gate all subsequent messages behind auth state. Correct pattern but adds handshake complexity to both server and client.
+- **Cookie inspection on WS upgrade**: Browsers send cookies on the WebSocket upgrade handshake. The `httpOnly` refresh token cookie would arrive. Requires server-side cookie parsing on the WS route — workable but requires re-validating a refresh token (which is intended for a different endpoint).
+- **JWT in query param (`?token=`)**: Passes the full access token in the URL. Works everywhere, but the token appears in server access logs and browser history — a meaningful credential leak.
+
+### Why we chose ?org_id= (not the full token)
+- `org_id` is a non-secret database integer, not a credential. It identifies which org's events to stream, not who is allowed to connect.
+- Passing a full JWT in a URL query param is explicitly flagged in OAuth 2.0 security best current practice (RFC 9700) as high-risk.
+- The `ConnectionManager` enforces isolation by broadcasting only to sockets registered for the matching `org_id`. A connection with a wrong `org_id` receives no events for that org.
+- **Known limitation**: A client that guesses another org's `org_id` integer could receive that org's live pipeline events. This is a demo-grade simplification. Production would use first-message auth or cookie inspection.
+
+### Result
+`LiveEventsContext.tsx` connects with `ws://localhost:8000/ws/live?org_id=${user.org_id}`. `ws.py` `ConnectionManager` stores connections in `dict[int, list[WebSocket]]` keyed by `org_id` and calls `broadcast_to_org(org_id, data)`.
+
+---
+
+## Decision #016 — CORS allow_origins as an explicit list, required by credentials + CORS spec
+**Date:** 2026-09-03
+**Area:** Auth / CORS / Security
+
+### Decision
+Set `allow_origins=["http://localhost:5173"]` explicitly in the FastAPI CORS middleware instead of `allow_origins=["*"]`.
+
+### Context
+The frontend makes credentialed cross-origin requests (the `httpOnly` refresh token cookie is sent on every `POST /api/auth/refresh`). This requires `allow_credentials=True` on the CORS middleware. The CORS specification explicitly states that when `allow_credentials=True`, the `Access-Control-Allow-Origin` response header **must not** be `*` — it must reflect the specific requesting origin. Browsers enforce this: if the server returns `Access-Control-Allow-Origin: *` with `Access-Control-Allow-Credentials: true`, the browser blocks the response entirely.
+
+### Alternatives considered
+- **`allow_origins=["*"]` with `allow_credentials=False`**: Works for public, cookie-free APIs. Not applicable here.
+- **Dynamic origin reflection**: Read the `Origin` request header and echo it back verbatim as `Access-Control-Allow-Origin`. Maximally permissive — allows any origin to make credentialed requests, including attacker-controlled domains.
+
+### Why we chose an explicit list
+- The CORS spec is unambiguous: wildcard + credentials = browser rejection. There is no workaround; the explicit origin list is mandatory, not optional.
+- An explicit list is also the more secure default — it does not accidentally allow staging, preview, or attacker-controlled domains to make credentialed requests.
+- In a deployed environment, this list is replaced with the production frontend domain(s).
+
+### Why we rejected the alternatives
+- Wildcard with credentials: The browser rejects the preflight and the subsequent request. `POST /api/auth/refresh` would silently fail, breaking session bootstrap on every page load.
+- Dynamic reflection: Bypasses the entire purpose of CORS origin restriction.
+
+### Result
+`app/main.py` sets `allow_origins=["http://localhost:5173"]`, `allow_credentials=True`, `allow_methods=["*"]`, `allow_headers=["*"]`. All credentialed frontend requests succeed. Preflight `OPTIONS` responses carry the correct `Access-Control-Allow-Origin` header.
