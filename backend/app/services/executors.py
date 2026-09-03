@@ -89,7 +89,8 @@ def execute_instant_retry(tx: Transaction, decision: Decision, session: Session)
     }
     
     try:
-        resp = rzp_client.order.create(data=payload)
+        order_api = getattr(rzp_client, "order")
+        resp = order_api.create(data=payload)
         # Success if we got an order back
         if "id" in resp:
             _mark_recovered(tx, tx.amount)
@@ -127,7 +128,8 @@ def execute_payment_link(tx: Transaction, decision: Decision, session: Session) 
     }
     
     try:
-        resp = rzp_client.payment_link.create(payload)
+        plink_api = getattr(rzp_client, "payment_link")
+        resp = plink_api.create(payload)
         if "id" in resp:
             # We treat sending the link as an action success, but the TX is still 'recovering' until paid.
             # For the buildathon demo, we will simulate immediate recovery if the link was created successfully.

@@ -200,12 +200,13 @@ def build_records() -> list[dict]:
     # Decide which ~8% will have dnd_opt_out=True
     dnd_indices = set(random.sample(range(TOTAL), k=round(TOTAL * DND_RATE)))
 
+    from typing import cast
     idx = 0
     for cat in CATEGORIES:
-        cat_count = int(cat["count"])
-        amount_prof = str(cat["amount_profile"])
-        reasons_list = list(cat["reasons"])
-        cat_enum: RootCauseCategory = cat["category"]
+        cat_count = cast(int, cat["count"])
+        amount_prof = cast(str, cat["amount_profile"])
+        reasons_list = cast(list[str], cat["reasons"])
+        cat_enum = cast(RootCauseCategory, cat["category"])
         for _ in range(cat_count):
             bank = random.choices(BANKS, weights=BANK_WEIGHTS, k=1)[0]
             records.append(
