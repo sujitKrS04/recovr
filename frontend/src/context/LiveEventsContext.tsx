@@ -50,10 +50,6 @@ export const LiveEventsProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [chartData, setChartData] = useState<ChartPoint[]>([
     { time: '00:00', txIndex: 0, agentRate: 0, baselineRate: 0, recoveredAmount: 0 },
-    { time: '00:05', txIndex: 30, agentRate: 28, baselineRate: 20, recoveredAmount: 42000 },
-    { time: '00:10', txIndex: 60, agentRate: 42, baselineRate: 31, recoveredAmount: 98000 },
-    { time: '00:15', txIndex: 90, agentRate: 47, baselineRate: 34, recoveredAmount: 135000 },
-    { time: '00:20', txIndex: 120, agentRate: 48.6, baselineRate: 36.0, recoveredAmount: 160446 },
   ]);
   const [batchProgress, setBatchProgress] = useState({ processed: 0, total: 120, recovered: 0 });
 

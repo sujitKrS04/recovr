@@ -34,46 +34,7 @@ export const ReviewQueuePage: React.FC = () => {
     setHandledIds((prev) => [...prev, txId]);
   };
 
-  const initialFallbackItems: ReviewQueueItem[] = [
-    {
-      transaction_id: 3,
-      customer_name: 'Kavya Nair',
-      amount: 4500,
-      failure_reason: 'Transaction flagged by automated fraud detection engine',
-      category: 'fraud_false_positive',
-      confidence: 0.10,
-      decision_reasoning: 'Fraud-adjacent signal detected. High risk: auto-execution strictly prohibited by defense-in-depth safety guard. Requires manual agent sign-off.',
-    },
-    {
-      transaction_id: 12,
-      customer_name: 'Vikram Mehta',
-      amount: 14200,
-      failure_reason: 'Risk engine declined - unusual spending pattern from new IP',
-      category: 'fraud_false_positive',
-      confidence: 0.15,
-      decision_reasoning: 'Unrecognized anomaly detected. Confidence (0.15) below threshold (0.75) -> Escalate to human operator for verification.',
-    },
-    {
-      transaction_id: 21,
-      customer_name: 'Priya Sundaram',
-      amount: 38000,
-      failure_reason: 'Suspicious activity flag from issuer risk system',
-      category: 'fraud_false_positive',
-      confidence: 0.10,
-      decision_reasoning: 'High-value transaction flagged by bank risk system. Requires operator verification before outreach.',
-    },
-    {
-      transaction_id: 42,
-      customer_name: 'Manish Joshi',
-      amount: 9200,
-      failure_reason: 'Velocity check triggered - multiple attempts across different cards',
-      category: 'fraud_false_positive',
-      confidence: 0.20,
-      decision_reasoning: 'Velocity limit exceeded. Deferring to human review to prevent chargeback risk.',
-    },
-  ];
-
-  const items: ReviewQueueItem[] = (queueData && queueData.length > 0 ? queueData : initialFallbackItems)
+  const items: ReviewQueueItem[] = (queueData || [])
     .filter((item) => !handledIds.includes(item.transaction_id));
 
   return (

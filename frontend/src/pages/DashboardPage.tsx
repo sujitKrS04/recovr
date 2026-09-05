@@ -63,13 +63,13 @@ export const DashboardPage: React.FC = () => {
     queryFn: () => api.getTransactions(undefined, undefined, 6, 0),
   });
 
-  const totalAtRisk = summary?.total_at_risk || 329993;
-  const totalRecovered = summary?.total_recovered || 160446;
-  const totalRecovering = summary?.total_recovering || 42500;
-  const recoveryRate = summary?.recovery_rate || 48.6;
-  const baselineRate = summary?.baseline_recovery_rate || 36.0;
+  const totalAtRisk = summary?.total_at_risk ?? 0;
+  const totalRecovered = summary?.total_recovered ?? 0;
+  const totalRecovering = summary?.total_recovering ?? 0;
+  const recoveryRate = summary?.recovery_rate ?? 0;
+  const baselineRate = summary?.baseline_recovery_rate ?? 0;
   const upliftDelta = Number((recoveryRate - baselineRate).toFixed(1));
-  const upliftPercent = baselineRate > 0 ? Number((((recoveryRate - baselineRate) / baselineRate) * 100).toFixed(1)) : 35.1;
+  const upliftPercent = baselineRate > 0 ? Number((((recoveryRate - baselineRate) / baselineRate) * 100).toFixed(1)) : 0;
 
   // Prepare Category Breakdown Data
   const categoriesData = summary?.categories 
@@ -90,14 +90,7 @@ export const DashboardPage: React.FC = () => {
           rate: rate,
         };
       })
-    : [
-        { key: 'gateway_timeout', name: 'Gateway Timeout', action: 'instant_retry', Icon: Server, atRisk: 74834, recovered: 74834, recovering: 0, outstanding: 0, rate: 100 },
-        { key: 'bank_downtime', name: 'Bank Downtime', action: 'instant_retry', Icon: Server, atRisk: 68058, recovered: 68058, recovering: 0, outstanding: 0, rate: 100 },
-        { key: 'insufficient_funds', name: 'Low Funds', action: 'payment_link', Icon: CreditCard, atRisk: 17554, recovered: 10000, recovering: 7554, outstanding: 0, rate: 56 },
-        { key: 'card_declined', name: 'Card Declined', action: 'update_card_prompt', Icon: CreditCard, atRisk: 69700, recovered: 0, recovering: 15000, outstanding: 54700, rate: 0 },
-        { key: 'otp_failure', name: 'OTP Auth Failure', action: 'instant_retry', Icon: AlertCircle, atRisk: 33336, recovered: 0, recovering: 0, outstanding: 33336, rate: 0 },
-        { key: 'fraud_false_positive', name: 'Fraud / Risk Flag', action: 'escalate_human', Icon: ShieldCheck, atRisk: 66511, recovered: 0, recovering: 0, outstanding: 66511, rate: 0 },
-      ];
+    : [];
 
   return (
     <div className="space-y-6 pb-12">
@@ -218,10 +211,17 @@ export const DashboardPage: React.FC = () => {
       </AnimatePresence>
 
       {/* Hero Metric Row (5 Cards) */}
-      {summaryLoading ? (
+      {summaryLoading || !summary ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {[1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-32 w-full" />
+            <div key={i} className="bg-card border border-border rounded-xl p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-8 rounded-lg" />
+              </div>
+              <Skeleton className="h-8 w-32" />
+              <Skeleton className="h-3 w-28" />
+            </div>
           ))}
         </div>
       ) : (
@@ -231,7 +231,7 @@ export const DashboardPage: React.FC = () => {
             value={totalAtRisk}
             prefix="₹"
             icon={DollarSign}
-            subtitle="120 failed transactions"
+            subtitle={totalAtRisk > 0 ? "Failed transactions" : "No failed transactions"}
             delay={0.05}
           />
           <MetricCard
@@ -372,49 +372,67 @@ export const DashboardPage: React.FC = () => {
             </div>
 
             {/* Horizontal Bar Chart */}
-            <div className="h-40 sm:h-44 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  layout="vertical"
-                  data={categoriesData.slice(0, 4)}
-                  margin={{ top: 5, right: 10, left: 10, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#252D45" opacity={0.4} horizontal={false} />
-                  <XAxis type="number" stroke="#8B9CC7" fontSize={10} tickFormatter={(val) => `₹${val / 1000}k`} />
-                  <YAxis type="category" dataKey="name" stroke="#8B9CC7" fontSize={10} width={90} tickLine={false} />
-                  <Tooltip
-                    formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, '']}
-                    contentStyle={{
-                      backgroundColor: '#151B29',
-                      borderColor: '#252D45',
-                      borderRadius: '8px',
-                      fontSize: '11px',
-                    }}
-                  />
-                  <Bar dataKey="recovered" name="Recovered" fill="#00D4A0" radius={[0, 0, 0, 0]} stackId="a" />
-                  <Bar dataKey="recovering" name="Recovering" fill="#635BFF" radius={[0, 0, 0, 0]} stackId="a" />
-                  <Bar dataKey="outstanding" name="Outstanding" fill="#252D45" radius={[0, 4, 4, 0]} stackId="a" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {summaryLoading || !summary ? (
+              <div className="h-40 sm:h-44 w-full flex items-center justify-center">
+                <Skeleton className="h-36 w-full rounded-lg" />
+              </div>
+            ) : categoriesData.length === 0 ? (
+              <div className="h-40 sm:h-44 w-full flex items-center justify-center text-xs text-muted-foreground border border-dashed border-border/70 rounded-lg p-4 text-center">
+                No category data available yet. Run a batch to see breakdown.
+              </div>
+            ) : (
+              <div className="h-40 sm:h-44 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    layout="vertical"
+                    data={categoriesData.slice(0, 4)}
+                    margin={{ top: 5, right: 10, left: 10, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#252D45" opacity={0.4} horizontal={false} />
+                    <XAxis type="number" stroke="#8B9CC7" fontSize={10} tickFormatter={(val) => `₹${val / 1000}k`} />
+                    <YAxis type="category" dataKey="name" stroke="#8B9CC7" fontSize={10} width={90} tickLine={false} />
+                    <Tooltip
+                      formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, '']}
+                      contentStyle={{
+                        backgroundColor: '#151B29',
+                        borderColor: '#252D45',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                      }}
+                    />
+                    <Bar dataKey="recovered" name="Recovered" fill="#00D4A0" radius={[0, 0, 0, 0]} stackId="a" />
+                    <Bar dataKey="recovering" name="Recovering" fill="#635BFF" radius={[0, 0, 0, 0]} stackId="a" />
+                    <Bar dataKey="outstanding" name="Outstanding" fill="#252D45" radius={[0, 4, 4, 0]} stackId="a" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
             {/* Category summary pills */}
-            <div className="space-y-2 mt-2">
-              {categoriesData.slice(0, 3).map((cat) => (
-                <div key={cat.key} className="flex items-center justify-between p-2 rounded-lg bg-background/50 border border-border/60 text-xs">
-                  <div className="flex items-center gap-2">
-                    <cat.Icon className="w-3.5 h-3.5 text-primary" />
-                    <span className="font-medium text-foreground">{cat.name}</span>
+            {summaryLoading || !summary ? (
+              <div className="space-y-2 mt-2">
+                <Skeleton className="h-8 w-full rounded-lg" />
+                <Skeleton className="h-8 w-full rounded-lg" />
+                <Skeleton className="h-8 w-full rounded-lg" />
+              </div>
+            ) : (
+              <div className="space-y-2 mt-2">
+                {categoriesData.slice(0, 3).map((cat) => (
+                  <div key={cat.key} className="flex items-center justify-between p-2 rounded-lg bg-background/50 border border-border/60 text-xs">
+                    <div className="flex items-center gap-2">
+                      <cat.Icon className="w-3.5 h-3.5 text-primary" />
+                      <span className="font-medium text-foreground">{cat.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-mono">
+                      <span className="text-success font-semibold">₹{cat.recovered.toLocaleString('en-IN')}</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-muted text-muted-foreground">
+                        {cat.rate}%
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 font-mono">
-                    <span className="text-success font-semibold">₹{cat.recovered.toLocaleString('en-IN')}</span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-muted text-muted-foreground">
-                      {cat.rate}%
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
@@ -470,31 +488,33 @@ export const DashboardPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40 font-mono">
-                {(recentTxs && recentTxs.length > 0 ? recentTxs : [
-                  { id: 1, external_payment_id: 'pay_001', customer_name: 'Aarav Patel', amount: 1079, failure_reason: 'Insufficient funds in account', category: 'insufficient_funds', action: 'payment_link', auto_executed: true, status: 'recovered' },
-                  { id: 2, external_payment_id: 'pay_002', customer_name: 'Diya Sharma', amount: 2501, failure_reason: 'Bank server maintenance', category: 'bank_downtime', action: 'instant_retry', auto_executed: true, status: 'recovered' },
-                  { id: 3, external_payment_id: 'pay_003', customer_name: 'Kavya Nair', amount: 4500, failure_reason: 'Automated fraud risk flag', category: 'fraud_false_positive', action: 'escalate_human', auto_executed: false, status: 'escalated' },
-                  { id: 6, external_payment_id: 'pay_006', customer_name: 'Rohan Gupta', amount: 3200, failure_reason: 'Card expired', category: 'card_declined', action: 'update_card_prompt', auto_executed: false, status: 'suppressed' },
-                  { id: 14, external_payment_id: 'pay_014', customer_name: 'Ananya Verma', amount: 1850, failure_reason: 'Low balance', category: 'insufficient_funds', action: 'payment_link', auto_executed: true, status: 'recovered' },
-                ]).map((row) => (
-                  <tr key={row.id} className="hover:bg-background/40 transition-colors">
-                    <td className="py-3 pr-4 text-muted-foreground font-mono">tx_{row.id}</td>
-                    <td className="py-3 px-4 font-sans font-medium text-foreground">{row.customer_name}</td>
-                    <td className="py-3 px-4 text-foreground">₹{Number(row.amount).toLocaleString('en-IN')}</td>
-                    <td className="py-3 px-4 text-muted-foreground font-sans truncate max-w-[200px]" title={row.failure_reason}>
-                      {row.failure_reason}
-                    </td>
-                    <td className="py-3 px-4 font-sans">
-                      {row.category ? <StatusBadge status={row.category} size="sm" /> : <span className="text-muted-foreground">—</span>}
-                    </td>
-                    <td className="py-3 px-4 font-sans">
-                      {row.action ? <StatusBadge status={row.action} size="sm" /> : <span className="text-muted-foreground">—</span>}
-                    </td>
-                    <td className="py-3 pl-4 text-right font-sans">
-                      <StatusBadge status={row.status} size="sm" />
+                {recentTxs && recentTxs.length > 0 ? (
+                  recentTxs.map((row) => (
+                    <tr key={row.id} className="hover:bg-background/40 transition-colors">
+                      <td className="py-3 pr-4 text-muted-foreground font-mono">tx_{row.id}</td>
+                      <td className="py-3 px-4 font-sans font-medium text-foreground">{row.customer_name}</td>
+                      <td className="py-3 px-4 text-foreground">₹{Number(row.amount).toLocaleString('en-IN')}</td>
+                      <td className="py-3 px-4 text-muted-foreground font-sans truncate max-w-[200px]" title={row.failure_reason}>
+                        {row.failure_reason}
+                      </td>
+                      <td className="py-3 px-4 font-sans">
+                        {row.category ? <StatusBadge status={row.category} size="sm" /> : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="py-3 px-4 font-sans">
+                        {row.action ? <StatusBadge status={row.action} size="sm" /> : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="py-3 pl-4 text-right font-sans">
+                        <StatusBadge status={row.status} size="sm" />
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-muted-foreground font-sans">
+                      No transactions recorded yet. Run a batch to start the recovery pipeline.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>

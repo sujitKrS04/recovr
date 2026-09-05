@@ -27,70 +27,7 @@ export const ReceiptsPage: React.FC = () => {
     queryFn: api.getReceipts,
   });
 
-  const fallbackReceipts: ReceiptItem[] = [
-    {
-      id: 1,
-      transaction_id: 1,
-      customer_name: 'Aarav Patel',
-      amount: 1079,
-      amount_recovered: 1079,
-      root_cause: 'insufficient_funds',
-      action_taken: 'payment_link',
-      outcome: 'recovered',
-      reasoning: 'Classified as insufficient_funds (95% confidence, rule). Routed to payment_link: Insufficient funds detected. Sending payment link to give customer time and a nudge. Recovered INR 1,079 successfully.',
-      generated_at: '2026-08-30 20:34:58',
-    },
-    {
-      id: 2,
-      transaction_id: 2,
-      customer_name: 'Diya Sharma',
-      amount: 2501,
-      amount_recovered: 2501,
-      root_cause: 'bank_downtime',
-      action_taken: 'instant_retry',
-      outcome: 'recovered',
-      reasoning: 'Classified as bank_downtime (90% confidence, rule). Routed to instant_retry: Clean signal for technical downtime (bank_downtime). Safe to auto-retry. Recovered INR 2,501 successfully.',
-      generated_at: '2026-08-30 20:34:58',
-    },
-    {
-      id: 3,
-      transaction_id: 3,
-      customer_name: 'Kavya Nair',
-      amount: 4500,
-      amount_recovered: null,
-      root_cause: 'fraud_false_positive',
-      action_taken: 'escalate_human',
-      outcome: 'escalated',
-      reasoning: 'Classified as fraud_false_positive (10% confidence, llm). Routed to escalate_human: High-risk anomaly detected. Confidence (0.10) below threshold (0.75) -> Escalate to human review. Escalated to human review queue for manual intervention.',
-      generated_at: '2026-08-30 20:34:58',
-    },
-    {
-      id: 4,
-      transaction_id: 6,
-      customer_name: 'Rohan Gupta',
-      amount: 3200,
-      amount_recovered: null,
-      root_cause: 'card_declined',
-      action_taken: 'update_card_prompt',
-      outcome: 'suppressed',
-      reasoning: 'Classified as card_declined (95% confidence, rule). Routed to update_card_prompt: Expired card requires update. Action BLOCKED by Compliance Guard: Customer has opted into DND. Status set to suppressed.',
-      generated_at: '2026-08-30 20:34:58',
-    },
-    {
-      id: 5,
-      transaction_id: 14,
-      customer_name: 'Ananya Verma',
-      amount: 1850,
-      amount_recovered: 1850,
-      root_cause: 'insufficient_funds',
-      action_taken: 'payment_link',
-      outcome: 'recovered',
-      reasoning: 'Classified as insufficient_funds (95% confidence, rule). Routed to payment_link: Insufficient funds detected. Sending payment link to give customer time and a nudge. Recovered INR 1,850 successfully.',
-      generated_at: '2026-08-30 20:34:58',
-    },
-  ];
-
-  const receipts: ReceiptItem[] = receiptsData && receiptsData.length > 0 ? receiptsData : fallbackReceipts;
+  const receipts: ReceiptItem[] = receiptsData || [];
 
   const filteredReceipts = receipts.filter(
     (r) =>
@@ -153,6 +90,10 @@ export const ReceiptsPage: React.FC = () => {
               <div className="h-16 w-full rounded bg-[#1E2640]/60 animate-pulse" />
             </div>
           ))}
+        </div>
+      ) : filteredReceipts.length === 0 ? (
+        <div className="p-12 text-center text-xs text-muted-foreground bg-card border border-dashed border-border/70 rounded-xl">
+          No recovery receipts found. Receipts are created automatically as transactions are recovered, escalated, or suppressed.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
