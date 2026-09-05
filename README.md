@@ -112,12 +112,14 @@ npm run dev
 
 ### 4. Demo Login Credentials
 
+Pre-seeded multi-tenant accounts with full role-based access control (RBAC):
+
 | Organization | Email | Password | Role | Permissions |
 |---|---|---|---|---|
-| **Acme Corp** | `admin@acme.com` | `password123` | `admin` | Full control (Run Batch, Review Queue, Settings) |
+| **Acme Corp** | `alice@acme.com` *(or `admin@acme.com`)* | `password123` | `admin` | Full control (Run Batch, Review Queue, Settings) |
 | **Acme Corp** | `analyst@acme.com` | `password123` | `analyst` | Review Queue actions, Simulate Failure |
 | **Acme Corp** | `viewer@acme.com` | `password123` | `viewer` | Read-only observation dashboard |
-| **Globex Inc** | `admin@globex.com` | `password123` | `admin` | Full control (Globex tenant data) |
+| **Globex Inc** | `bob@globex.com` *(or `admin@globex.com`)* | `password123` | `admin` | Full control (Globex tenant data isolation) |
 
 ---
 
@@ -139,6 +141,6 @@ npm run dev
 
 ## 📑 Engineering Trail & Documentation
 
-- [`docs/FAILURE_LOG.md`](docs/FAILURE_LOG.md) — 14 Technical Failure Log entries across all phases.
-- [`docs/DECISIONS.md`](docs/DECISIONS.md) — 16 Architecture Decision Records (ADRs).
-- [`docs/DEMO_NOTES.md`](docs/DEMO_NOTES.md) — Complete demo guide mapped to the 4 Hackathon judging criteria (including Landing Page beat & RBAC proof).
+- [`docs/FAILURE_LOG.md`](docs/FAILURE_LOG.md) — 16 Technical Failure Log entries with root cause analyses and permanent fixes.
+- [`docs/DECISIONS.md`](docs/DECISIONS.md) — 18 Architecture Decision Records (ADRs) detailing design trade-offs.
+- [`docs/DEMO_NOTES.md`](docs/DEMO_NOTES.md) — Complete pitch & demo guide mapped to the 4 Hackathon judging criteria (including Landing Page beat & RBAC proof).

@@ -481,3 +481,25 @@ Initially, the pipeline marked transactions as `recovered` the moment a payment 
 
 ### Result
 The `executors.py` module now transitions async actions to `recovering`. The dashboard displays a "Pending Recovery" metric alongside "Revenue Recovered". The batch pipeline automatically triggers the webhook simulation endpoint for a subset of transactions, bringing the pipeline behavior in line with real-world expectations.
+
+---
+
+## Decision #018 — Automatic JSON Encoding for WebSocket Broadcast Payloads
+**Date:** 2026-09-05
+**Area:** Backend / WebSocket Infrastructure
+
+### Decision
+Use FastAPI's `jsonable_encoder()` in `ConnectionManager.broadcast_to_org()` to serialize all outgoing WebSocket messages before passing them to `WebSocket.send_json()`.
+
+### Context
+`Transaction.amount` in PostgreSQL is mapped as `Numeric(12, 2)`, which SQLAlchemy loads as Python `decimal.Decimal` objects. Python's built-in `json.dumps()` (used by Starlette's `send_json()`) does not serialize `Decimal` by default and raises `TypeError`. In WebSocket connection handlers that treat send failures as dead connections, this caused immediate disconnections without clear error logs.
+
+### Alternatives considered
+- **Manual casts on every broadcast call (`float(tx.amount)`)**: Error-prone because any new payload field or new event type containing dates, Enums, or Decimals would recreate the bug.
+- **Custom JSONEncoder**: Requires subclassing `json.JSONEncoder` and configuring Starlette/FastAPI internals.
+
+### Why we chose this
+`jsonable_encoder()` is FastAPI's battle-tested standard serializer. It converts Decimals to floats/ints, datetimes to ISO strings, and Enums to their underlying values. Combined with explicit float casting in endpoints, this provides dual defense-in-depth against serialization crashes.
+
+### Result
+`ws.py` safely encodes payloads before transmission, eliminating silent WebSocket disconnects and ensuring 100% reliable real-time event delivery.

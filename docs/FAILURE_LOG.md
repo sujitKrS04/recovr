@@ -4,6 +4,40 @@ This document tracks all meaningful technical failures, how they were detected, 
 
 ---
 
+## Failure #016 — WebSocket live event stream froze on batch run due to Decimal JSON serialization TypeError
+**Date:** 2026-09-05
+**Phase:** Phase 12 — Final Polish & End-to-End Verification
+**Component:** Backend / WebSocket Manager (`ws.py`), API Endpoints (`endpoints.py`), Frontend Context (`LiveEventsContext.tsx`)
+
+### What broke?
+When an admin clicked "Run Batch" in the header, the frontend button changed to "Processing Batch..." and the Live Feed displayed "Awaiting Live Pipeline Events", but no live events ever rendered in the stream. The UI remained permanently frozen in the running state for over 5 minutes with zero error toasts or notifications.
+
+### How was it detected?
+Observed during live user verification after multi-tenant login. Checking the database confirmed all 120 transactions had completed processing, yet the browser screen showed 0 processed events and was still "awaiting events".
+
+### Root cause
+1. In `app/models/models.py`, `Transaction.amount` is mapped as `Numeric(12, 2)`, which SQLAlchemy instantiates as Python `decimal.Decimal` objects.
+2. In `_run_batch_pipeline()`, the broadcast payload passed raw `tx.amount` directly: `{"amount": tx.amount, ...}`.
+3. Starlette's `connection.send_json(payload)` relies on Python's standard `json.dumps()`, which immediately raised `TypeError: Object of type Decimal is not JSON serializable` on the very first event.
+4. `ConnectionManager.broadcast_to_org()` caught all exceptions and silently treated failing sockets as dead, calling `self.disconnect(ws, org_id)`. The user's WebSocket connection was terminated on message 1 without logging an error.
+5. In the frontend, `LiveEventsContext.tsx` only reset `isRunning: false` via an event-driven debounce timer in `ws.onmessage`. Since no message ever arrived, `isRunning` remained `true` indefinitely.
+
+### What did we change?
+1. **Payload Safe-Encoding in WebSocket Manager (`backend/app/api/ws.py`):** Wrapped messages with FastAPI's `jsonable_encoder()` before calling `send_json()`, automatically converting `Decimal`, `datetime`, and `Enum` types into JSON primitives. Added warning logs for broadcast exceptions.
+2. **Explicit Float Casting (`backend/app/api/endpoints.py`):** Converted all 7 `tx.amount` broadcast payload references to `float(tx.amount)`.
+3. **Frontend Safety Timeout (`frontend/src/context/LiveEventsContext.tsx`):** Added a 35-second failsafe timeout to `runBatch()` that automatically resets `isRunning: false` and invalidates query caches if stream events fail to arrive.
+
+### Why this fix?
+Solves the root serialization issue at both layers (defense-in-depth), prevents silent WebSocket drops, and guarantees the frontend UI can never lock up permanently.
+
+### Verification
+Restarted the backend and triggered "Run Batch" via browser automation. Verified that events immediately streamed row-by-row into the Live Action Feed (with category badges, conviction scores, and statuses), and the button cleanly reset upon completion.
+
+### Final result
+Resolved in commit `57f65ed`. Live stream functions with 100% reliability.
+
+---
+
 ## Failure #015 — "Recovered" revenue metric inflated by counting async action executions instead of confirmed payments
 **Date:** 2026-09-03
 **Phase:** Phase 12 — Final Polish & Accuracy Fixes

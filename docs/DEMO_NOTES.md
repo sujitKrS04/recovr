@@ -133,18 +133,23 @@ Click **"Open dashboard"** → seamless route to `/dashboard` with the AppShell 
 - **Why it matters:** Financial systems must fail safe, never silently fail or misclassify unhandled errors.
 
 ### 4.3 Engineering Failure Log Summary
-All 11 technical failures encountered during development were recorded in [`docs/FAILURE_LOG.md`](FAILURE_LOG.md) with root causes and permanent fixes:
-- [#001 — PostgreSQL password authentication failure](FAILURE_LOG.md#failure-001--docker-compose-postgres-auth-failure)
-- [#002 — Python virtual environment Windows path resolution](FAILURE_LOG.md#failure-002--python-virtual-environment-missing-in-backend)
-- [#003 — Alembic fileConfig crash](FAILURE_LOG.md#failure-003--alembic-fileconfig-crash-due-to-missing-formatters-section)
-- [#004 — Keyword collision in summary printer](FAILURE_LOG.md#failure-004--keyword-collision-in-summary-printer-miscounted-distribution)
-- [#005 — setuptools pkg_resources deprecation](FAILURE_LOG.md#failure-005--razorpay-sdk-broken-by-missing-pkg_resources-setuptools-deprecation)
+All 16 technical failures encountered during development were recorded in [`docs/FAILURE_LOG.md`](FAILURE_LOG.md) with root causes and permanent fixes:
+- [#001 — setup_db.py crashed on Windows due to Unicode checkmarks + bad docstring escape](FAILURE_LOG.md#failure-001--setup_dbpy-crashed-on-windows-due-to-unicode-checkmarks--bad-docstring-escape)
+- [#002 — Docker Desktop not running; docker compose up failed](FAILURE_LOG.md#failure-002--docker-desktop-not-running-docker-compose-up-failed)
+- [#003 — Alembic fileConfig crash due to missing formatters section](FAILURE_LOG.md#failure-003--alembic-fileconfig-crash-due-to-missing-formatters-section)
+- [#004 — Keyword collision in summary printer miscounted distribution](FAILURE_LOG.md#failure-004--keyword-collision-in-summary-printer-miscounted-distribution)
+- [#005 — Razorpay SDK broken by missing pkg_resources](FAILURE_LOG.md#failure-005--razorpay-sdk-broken-by-missing-pkg_resources-setuptools-deprecation)
 - [#006 — Windows console cp1252 character encoding crash](FAILURE_LOG.md#failure-006--windows-console-cp1252-character-encoding-crash-with-unicode-arrows)
-- [#007 — OpenRouter unauthorized HTTP 401 handling](FAILURE_LOG.md#failure-007--openrouter-unauthorized-http-401-crashed-classifier)
+- [#007 — OpenRouter unauthorized HTTP 401 crashed classifier](FAILURE_LOG.md#failure-007--openrouter-unauthorized-http-401-crashed-classifier)
 - [#008 — Naive baseline test-mode key mock artifact](FAILURE_LOG.md#failure-008--mock-artifact-naive-baseline-always-succeeded-with-test-keys)
-- [#009 — Compliance guard `suppressed` status PostgreSQL enum mismatch](FAILURE_LOG.md#failure-009--compliance-guard-suppressed-status-crashed-execution-due-to-enum-mismatch)
+- [#009 — Compliance guard suppressed status crashed execution](FAILURE_LOG.md#failure-009--compliance-guard-suppressed-status-crashed-execution-due-to-enum-mismatch)
 - [#010 — API Batch runner object property mismatch](FAILURE_LOG.md#failure-010--api-batch-runner-crashed-due-to-object-property-mismatch-category-vs-root_cause_category)
 - [#011 — Browser TypeScript NodeJS.Timeout typing error](FAILURE_LOG.md#failure-011--browser-environment-typescript-namespace-error-with-nodejstimeout--parameter-signature-mismatch)
+- [#012 — Tailwind v4 CSS build failure in frontend](FAILURE_LOG.md#failure-012--tailwind-v4-css-build-failure-in-frontend)
+- [#013 — Access token lost on page refresh in memory-only storage model](FAILURE_LOG.md#failure-013--access-token-lost-on-page-refresh-in-memory-only-storage-model)
+- [#014 — Pyright type warnings across 6 backend files after auth refactor](FAILURE_LOG.md#failure-014--pyright-type-warnings-across-6-backend-files-after-auth-phase-refactor)
+- [#015 — Recovered revenue metric inflated by counting async action executions](FAILURE_LOG.md#failure-015--recovered-revenue-metric-inflated-by-counting-async-action-executions-instead-of-confirmed-payments)
+- [#016 — WebSocket live event stream froze due to Decimal serialization error](FAILURE_LOG.md#failure-016--websocket-live-event-stream-froze-on-batch-run-due-to-decimal-json-serialization-typeerror)
 
 ---
 

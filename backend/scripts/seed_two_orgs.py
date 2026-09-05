@@ -24,18 +24,40 @@ ORGS = [
     {
         "slug": "acme",
         "name": "Acme Corp",
-        "admin_email": "alice@acme.com",
-        "admin_password": "password123",
-        "admin_name": "Alice Admin",
         "seed_offset": 0,
+        "users": [
+            {
+                "email": "alice@acme.com",
+                "password": "password123",
+                "name": "Alice Admin",
+                "role": UserRole.admin,
+            },
+            {
+                "email": "analyst@acme.com",
+                "password": "password123",
+                "name": "Arthur Analyst",
+                "role": UserRole.analyst,
+            },
+            {
+                "email": "viewer@acme.com",
+                "password": "password123",
+                "name": "Violet Viewer",
+                "role": UserRole.viewer,
+            },
+        ],
     },
     {
         "slug": "globex",
         "name": "Globex Inc",
-        "admin_email": "bob@globex.com",
-        "admin_password": "password456",
-        "admin_name": "Bob Admin",
         "seed_offset": 1000,
+        "users": [
+            {
+                "email": "bob@globex.com",
+                "password": "password456",
+                "name": "Bob Admin",
+                "role": UserRole.admin,
+            },
+        ],
     },
 ]
 
@@ -54,21 +76,22 @@ def seed():
             else:
                 print(f"[found] Org '{spec['slug']}' (id={org.id})")
 
-            # 2. Get or create Admin User
-            user = db.query(User).filter(User.email == spec["admin_email"]).first()
-            if not user:
-                user = User(
-                    org_id=org.id,
-                    email=spec["admin_email"],
-                    hashed_password=hash_password(spec["admin_password"]),
-                    full_name=spec["admin_name"],
-                    role=UserRole.admin,
-                )
-                db.add(user)
-                db.flush()
-                print(f"[created] User '{spec['admin_email']}' (id={user.id})")
-            else:
-                print(f"[found] User '{spec['admin_email']}' (id={user.id})")
+            # 2. Get or create Users for this Org
+            for u_spec in spec["users"]:
+                user = db.query(User).filter(User.email == u_spec["email"]).first()
+                if not user:
+                    user = User(
+                        org_id=org.id,
+                        email=u_spec["email"],
+                        hashed_password=hash_password(u_spec["password"]),
+                        full_name=u_spec["name"],
+                        role=u_spec["role"],
+                    )
+                    db.add(user)
+                    db.flush()
+                    print(f"[created] User '{u_spec['email']}' (role={u_spec['role'].value}, id={user.id})")
+                else:
+                    print(f"[found] User '{u_spec['email']}' (role={user.role.value}, id={user.id})")
 
             # 3. Ensure Org has 120 starter transactions
             existing_tx_count = db.query(Transaction).filter(Transaction.org_id == org.id).count()
@@ -94,7 +117,9 @@ def seed():
         print("\nSeed complete.")
         print("\nCredentials:")
         for spec in ORGS:
-            print(f"  {spec['admin_email']} / {spec['admin_password']}  ->  {spec['slug']}")
+            print(f"Org: {spec['name']} ({spec['slug']})")
+            for u in spec["users"]:
+                print(f"  {u['email']} / {u['password']}  ->  [{u['role'].value}]")
     except Exception as e:
         db.rollback()
         print(f"Seed failed: {e}")
