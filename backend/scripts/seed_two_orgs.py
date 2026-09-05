@@ -14,13 +14,29 @@ import random
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from typing import TypedDict, List
 from app.core.database import SessionLocal
 from app.core.security import hash_password
 from app.models.auth_models import Organization, User, UserRole
 from app.models.models import Transaction, TransactionStatus
 from scripts.generate_batch import build_records, SEED
 
-ORGS = [
+
+class UserSpec(TypedDict):
+    email: str
+    password: str
+    name: str
+    role: UserRole
+
+
+class OrgSpec(TypedDict):
+    slug: str
+    name: str
+    seed_offset: int
+    users: List[UserSpec]
+
+
+ORGS: List[OrgSpec] = [
     {
         "slug": "acme",
         "name": "Acme Corp",
