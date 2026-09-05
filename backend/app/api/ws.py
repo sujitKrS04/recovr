@@ -26,11 +26,15 @@ class ConnectionManager:
 
     async def broadcast_to_org(self, org_id: int, message: dict) -> None:
         """Send a JSON message to all connections belonging to this org."""
+        from fastapi.encoders import jsonable_encoder
+        import logging
+        payload = jsonable_encoder(message)
         dead: List[WebSocket] = []
         for connection in list(self._connections.get(org_id, [])):
             try:
-                await connection.send_json(message)
-            except Exception:
+                await connection.send_json(payload)
+            except Exception as e:
+                logging.getLogger(__name__).warning(f"WebSocket broadcast error for org {org_id}: {e}")
                 dead.append(connection)
         for ws in dead:
             self.disconnect(ws, org_id)

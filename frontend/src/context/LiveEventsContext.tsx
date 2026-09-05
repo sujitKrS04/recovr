@@ -175,10 +175,20 @@ export const LiveEventsProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setEvents([]);
       setBatchProgress({ processed: 0, total: 120, recovered: 0 });
       setChartData([{ time: new Date().toLocaleTimeString(), txIndex: 0, agentRate: 0, baselineRate: 0, recoveredAmount: 0 }]);
+      if (isRunningTimerRef.current) clearTimeout(isRunningTimerRef.current);
+      // Safety timeout: if pipeline finishes or no events arrive within 35s, reset state
+      isRunningTimerRef.current = setTimeout(() => {
+        setIsRunning(false);
+        queryClient.invalidateQueries({ queryKey: ['summary'] });
+        queryClient.invalidateQueries({ queryKey: ['transactions'] });
+        queryClient.invalidateQueries({ queryKey: ['reviewQueue'] });
+        queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      }, 35000);
       await api.runBatch();
     } catch (err) {
       console.error('Failed to run batch:', err);
       setIsRunning(false);
+      if (isRunningTimerRef.current) clearTimeout(isRunningTimerRef.current);
     }
   };
 
