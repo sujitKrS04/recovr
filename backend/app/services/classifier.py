@@ -226,8 +226,10 @@ def _parse_llm_response(raw: dict, failure_reason: str) -> ClassificationResult:
     """Parse OpenRouter response into a ClassificationResult. Raises ValueError on bad output."""
     try:
         content = raw["choices"][0]["message"]["content"]
+        if content is None:
+            raise ValueError("LLM returned None content")
         data = json.loads(content)
-    except (KeyError, IndexError, json.JSONDecodeError) as exc:
+    except (KeyError, IndexError, json.JSONDecodeError, TypeError) as exc:
         raise ValueError(f"Malformed LLM response structure: {exc}") from exc
 
     cat_str = data.get("root_cause_category", "").strip()

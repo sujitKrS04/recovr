@@ -50,13 +50,13 @@ def get_summary(
     """Summary stats for the dashboard — scoped to the authenticated org."""
     org_id = current_user.org_id
     txs = db.query(Transaction).filter(Transaction.org_id == org_id).all()
-    total_at_risk = sum(tx.amount for tx in txs)
+    total_at_risk = sum((float(tx.amount) for tx in txs), 0.0)
 
     recovered_txs = [tx for tx in txs if tx.status == TransactionStatus.recovered]
-    total_recovered = sum(tx.amount for tx in recovered_txs)
+    total_recovered = sum((float(tx.amount) for tx in recovered_txs), 0.0)
     
     recovering_txs = [tx for tx in txs if tx.status == TransactionStatus.recovering]
-    total_recovering = sum(tx.amount for tx in recovering_txs)
+    total_recovering = sum((float(tx.amount) for tx in recovering_txs), 0.0)
 
     recovery_rate = (total_recovered / total_at_risk * 100) if total_at_risk else 0.0
 
@@ -72,14 +72,14 @@ def get_summary(
         if tx.classifications:
             cat = tx.classifications[0].root_cause_category.value
         if cat not in categories:
-            categories[cat] = {"total": 0, "recovered": 0, "at_risk": 0, "recovering": 0}
+            categories[cat] = {"total": 0, "recovered": 0.0, "at_risk": 0.0, "recovering": 0.0}
 
         categories[cat]["total"] += 1
-        categories[cat]["at_risk"] += tx.amount
+        categories[cat]["at_risk"] += float(tx.amount)
         if tx.status == TransactionStatus.recovered:
-            categories[cat]["recovered"] += tx.amount
+            categories[cat]["recovered"] += float(tx.amount)
         elif tx.status == TransactionStatus.recovering:
-            categories[cat]["recovering"] += tx.amount
+            categories[cat]["recovering"] += float(tx.amount)
 
     return {
         "total_at_risk": total_at_risk,

@@ -82,6 +82,16 @@ Click **"Open dashboard"** → seamless route to `/dashboard` with the AppShell 
   > *"We store short-lived access tokens strictly in memory — never in `localStorage` — specifically to close the XSS token-exfiltration vector. The refresh token lives in an `httpOnly` cookie, so no JavaScript on the page can ever read it by design. (See [`docs/DECISIONS.md #014`](DECISIONS.md#decision-014--access-token-stored-in-js-memory-explicit-xss-tradeoff))."*
 - **Why it matters:** Proves institutional fintech security posture. Prevents XSS token theft without degrading session continuity across reloads.
 
+### 2.5 Cross-Origin Cookie Configuration & Silent Refresh Verification (Phase 11)
+- **What to show:** Open Browser DevTools → Application tab → Cookies (`http://localhost:8000`).
+- **Explicit Verification Flow:**
+  1. Log in successfully (e.g. `alice@acme.com` / `password123`).
+  2. In DevTools → Application tab → Cookies, verify `refresh_token` cookie is set with `HttpOnly=true`, `SameSite=Lax`, `Path=/`, and not readable by JavaScript.
+  3. Wait for or manually expire the 15-minute access token (or trigger a refresh call).
+  4. Make an authenticated request (`GET /api/summary`) and confirm it triggers a silent background refresh call to `POST /api/auth/refresh`.
+  5. Confirm the refresh call succeeds (HTTP 200, not a silent 401) with `credentials: 'include'` carrying the cookie across origin ports (`localhost:5173` → `localhost:8000`), and a new access token is seamlessly issued.
+- **Why it matters:** Cross-origin cookie handling across ports is the most common silent failure point in local multi-tenant setups. Verifying `allow_credentials=True`, explicit `allow_origins=["http://localhost:5173"]`, and global `credentials: 'include'` ensures zero session loss.
+
 ---
 
 ## 🧠 Criterion 3 — AI Judgment

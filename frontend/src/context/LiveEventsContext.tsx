@@ -66,107 +66,117 @@ export const LiveEventsProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   });
   const { user } = useAuth();
 
-  const connectWebSocket = () => {
-    // Don't connect until we know the user's org_id
-    if (!user?.org_id) return;
-    const WS_URL = `ws://localhost:8000/ws/live?org_id=${user.org_id}`;
-    try {
-      const ws = new WebSocket(WS_URL);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setIsConnected(true);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          const newEvent: LiveEvent = {
-            id: `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-            timestamp: data.timestamp || new Date().toLocaleTimeString(),
-            ...data,
-          };
-
-          setEvents((prev) => [newEvent, ...prev.slice(0, 149)]);
-
-          // Track running progress
-          if (data.type === 'tx_executed' || data.type === 'tx_retried_recovered') {
-            recoveryAccumulatorRef.current.totalTx += 1;
-            if (data.status === 'recovered' || data.success) {
-              recoveryAccumulatorRef.current.count += 1;
-              recoveryAccumulatorRef.current.amount += data.amount || 0;
-            }
-
-            const currentTotal = recoveryAccumulatorRef.current.totalTx;
-            const currentRec = recoveryAccumulatorRef.current.count;
-            const currentAmt = recoveryAccumulatorRef.current.amount;
-
-            setBatchProgress({
-              processed: currentTotal,
-              total: 120,
-              recovered: currentRec,
-            });
-
-            // Update live chart curve
-            if (currentTotal % 10 === 0 || currentTotal === 120) {
-              const liveRate = Math.min(60, Number(((currentRec / currentTotal) * 100).toFixed(1)));
-              const baseRate = Math.min(40, Number((liveRate * 0.74).toFixed(1)));
-              setChartData((prev) => [
-                ...prev,
-                {
-                  time: newEvent.timestamp,
-                  txIndex: currentTotal,
-                  agentRate: liveRate,
-                  baselineRate: baseRate,
-                  recoveredAmount: currentAmt,
-                },
-              ]);
-            }
-          }
-
-          // Reset debounce timer on incoming events
-          setIsRunning(true);
-          if (isRunningTimerRef.current) clearTimeout(isRunningTimerRef.current);
-          isRunningTimerRef.current = setTimeout(() => {
-            setIsRunning(false);
-            // Invalidate queries to refresh dashboard & review queue
-            queryClient.invalidateQueries({ queryKey: ['summary'] });
-            queryClient.invalidateQueries({ queryKey: ['transactions'] });
-            queryClient.invalidateQueries({ queryKey: ['reviewQueue'] });
-            queryClient.invalidateQueries({ queryKey: ['receipts'] });
-          }, 3000);
-        } catch (e) {
-          console.error('Error parsing WebSocket message:', e);
-        }
-      };
-
-      ws.onclose = () => {
-        setIsConnected(false);
-        // Attempt reconnection after 3 seconds
-        setTimeout(connectWebSocket, 3000);
-      };
-
-      ws.onerror = () => {
-        setIsConnected(false);
-      };
-    } catch (e) {
-      console.error('WebSocket connection error:', e);
-    }
-  };
-
   useEffect(() => {
     if (!user?.org_id) return;
-    connectWebSocket();
+    
+    let reconnectTimeout: ReturnType<typeof setTimeout>;
+    let ws: WebSocket;
+    let isCancelled = false;
+
+    const connect = () => {
+      if (isCancelled) return;
+      const WS_URL = `ws://localhost:8000/ws/live?org_id=${user.org_id}`;
+      
+      try {
+        ws = new WebSocket(WS_URL);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          setIsConnected(true);
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            const newEvent: LiveEvent = {
+              id: `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+              timestamp: data.timestamp || new Date().toLocaleTimeString(),
+              ...data,
+            };
+
+            setEvents((prev) => [newEvent, ...prev.slice(0, 149)]);
+
+            // Track running progress
+            if (data.type === 'tx_executed' || data.type === 'tx_retried_recovered') {
+              recoveryAccumulatorRef.current.totalTx += 1;
+              if (data.status === 'recovered' || data.success) {
+                recoveryAccumulatorRef.current.count += 1;
+                recoveryAccumulatorRef.current.amount += data.amount || 0;
+              }
+
+              const currentTotal = recoveryAccumulatorRef.current.totalTx;
+              const currentRec = recoveryAccumulatorRef.current.count;
+              const currentAmt = recoveryAccumulatorRef.current.amount;
+
+              setBatchProgress({
+                processed: currentTotal,
+                total: 120,
+                recovered: currentRec,
+              });
+
+              // Update live chart curve
+              if (currentTotal % 10 === 0 || currentTotal === 120) {
+                const liveRate = Math.min(60, Number(((currentRec / currentTotal) * 100).toFixed(1)));
+                const baseRate = Math.min(40, Number((liveRate * 0.74).toFixed(1)));
+                setChartData((prev) => [
+                  ...prev,
+                  {
+                    time: newEvent.timestamp,
+                    txIndex: currentTotal,
+                    agentRate: liveRate,
+                    baselineRate: baseRate,
+                    recoveredAmount: currentAmt,
+                  },
+                ]);
+              }
+            }
+
+            // Reset debounce timer on incoming events
+            setIsRunning(true);
+            if (isRunningTimerRef.current) clearTimeout(isRunningTimerRef.current);
+            isRunningTimerRef.current = setTimeout(() => {
+              setIsRunning(false);
+              // Invalidate queries to refresh dashboard & review queue
+              queryClient.invalidateQueries({ queryKey: ['summary'] });
+              queryClient.invalidateQueries({ queryKey: ['transactions'] });
+              queryClient.invalidateQueries({ queryKey: ['reviewQueue'] });
+              queryClient.invalidateQueries({ queryKey: ['receipts'] });
+            }, 3000);
+          } catch (e) {
+            console.error('Error parsing WebSocket message:', e);
+          }
+        };
+
+        ws.onclose = () => {
+          setIsConnected(false);
+          if (!isCancelled) {
+            reconnectTimeout = setTimeout(connect, 3000);
+          }
+        };
+
+        ws.onerror = () => {
+          setIsConnected(false);
+        };
+      } catch (e) {
+        console.error('WebSocket connection error:', e);
+      }
+    };
+
+    connect();
+
     return () => {
-      if (wsRef.current) wsRef.current.close();
+      isCancelled = true;
+      clearTimeout(reconnectTimeout);
+      if (ws) ws.close();
       if (isRunningTimerRef.current) clearTimeout(isRunningTimerRef.current);
     };
-  }, [user?.org_id]);
+  }, [user?.org_id, queryClient]);
 
   const runBatch = async () => {
     try {
       setIsRunning(true);
       recoveryAccumulatorRef.current = { count: 0, amount: 0, totalTx: 0 };
+      setEvents([]);
       setBatchProgress({ processed: 0, total: 120, recovered: 0 });
       setChartData([{ time: new Date().toLocaleTimeString(), txIndex: 0, agentRate: 0, baselineRate: 0, recoveredAmount: 0 }]);
       await api.runBatch();
