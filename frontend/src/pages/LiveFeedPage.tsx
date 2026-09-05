@@ -37,83 +37,7 @@ export const LiveFeedPage: React.FC = () => {
     return true;
   });
 
-  // If no live events have occurred yet, provide initial demo stream preview
-  const displayEvents: LiveEvent[] = filteredEvents.length > 0 ? filteredEvents : [
-    {
-      id: 'demo-1',
-      type: 'tx_executed',
-      transaction_id: 2,
-      timestamp: '20:34:52',
-      customer_name: 'Diya Sharma',
-      amount: 2501,
-      category: 'bank_downtime',
-      action: 'instant_retry',
-      status: 'recovered',
-      confidence: 0.90,
-      reasoning: 'Razorpay payment retry executed successfully via test gateway',
-    },
-    {
-      id: 'demo-2',
-      type: 'tx_decided',
-      transaction_id: 2,
-      timestamp: '20:34:52',
-      customer_name: 'Diya Sharma',
-      amount: 2501,
-      category: 'bank_downtime',
-      action: 'instant_retry',
-      confidence: 0.90,
-      reasoning: 'Clean signal for technical downtime (bank_downtime). Safe to auto-retry.',
-    },
-    {
-      id: 'demo-3',
-      type: 'tx_classified',
-      transaction_id: 2,
-      timestamp: '20:34:52',
-      customer_name: 'Diya Sharma',
-      amount: 2501,
-      category: 'bank_downtime',
-      confidence: 0.90,
-      reasoning: 'Matched keyword rule: bank server undergoing scheduled maintenance',
-    },
-    {
-      id: 'demo-4',
-      type: 'tx_executed',
-      transaction_id: 1,
-      timestamp: '20:34:51',
-      customer_name: 'Aarav Patel',
-      amount: 1079,
-      category: 'insufficient_funds',
-      action: 'payment_link',
-      status: 'recovered',
-      confidence: 0.95,
-      reasoning: 'Created test payment link: https://rzp.io/i/test_link_1079',
-    },
-    {
-      id: 'demo-5',
-      type: 'tx_executed',
-      transaction_id: 6,
-      timestamp: '20:34:50',
-      customer_name: 'Rohan Gupta',
-      amount: 3200,
-      category: 'card_declined',
-      action: 'update_card_prompt',
-      status: 'suppressed',
-      confidence: 0.70,
-      reasoning: 'Compliance Guard blocked contact: customer is DND opted out',
-    },
-    {
-      id: 'demo-6',
-      type: 'tx_decided',
-      transaction_id: 3,
-      timestamp: '20:34:49',
-      customer_name: 'Kavya Nair',
-      amount: 4500,
-      category: 'fraud_false_positive',
-      action: 'escalate_human',
-      confidence: 0.10,
-      reasoning: 'Fraud-adjacent signal detected. High risk: auto-execution strictly prohibited.',
-    },
-  ];
+  const displayEvents: LiveEvent[] = filteredEvents;
 
   return (
     <div className="space-y-6 pb-12">
@@ -178,8 +102,17 @@ export const LiveFeedPage: React.FC = () => {
 
       {/* Event Stream List */}
       <div className="space-y-3">
-        <AnimatePresence initial={false}>
-          {displayEvents.map((ev, index) => {
+        {displayEvents.length === 0 ? (
+          <div className="p-12 text-center bg-card border border-dashed border-border/70 rounded-xl space-y-2">
+            <Radio className="w-8 h-8 text-muted-foreground mx-auto animate-pulse" />
+            <p className="text-sm font-semibold text-foreground">Awaiting Live Pipeline Events</p>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              Run a batch from the header or trigger failure simulation to watch live classifications, decisions, and executions stream in real-time.
+            </p>
+          </div>
+        ) : (
+          <AnimatePresence initial={false}>
+            {displayEvents.map((ev, index) => {
             const isFailureInjected = ev.type === 'tx_failed_injected';
             const isRetriedRecovered = ev.type === 'tx_retried_recovered';
             const isExecuted = ev.type === 'tx_executed' || isRetriedRecovered;
@@ -288,6 +221,7 @@ export const LiveFeedPage: React.FC = () => {
             );
           })}
         </AnimatePresence>
+        )}
       </div>
     </div>
   );
